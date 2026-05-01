@@ -1,160 +1,111 @@
--- Вставьте в StarterGui как LocalScript
+-- Vanezy Universal ESP (Max Compatible)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 
--- Создаём GUI для ESP
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ESP_System"
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local ESPEnabled = true
 
--- Функция создания метки для игрока
-local function createESP(targetPlayer)
-    local character = targetPlayer.Character
-    if not character then return nil end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return nil end
-    
-    -- Создаём текстовую метку
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(0, 200, 0, 30)
-    textLabel.BackgroundTransparency = 0.5
-    textLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-    textLabel.TextStrokeTransparency = 0
-    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 14
-    textLabel.Parent = screenGui
-    
-    -- Обновление позиции и текста
-    local connection
-    connection = RunService.RenderStepped:Connect(function()
-        if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            textLabel:Destroy()
-            connection:Disconnect()
-            return
-        end
-        
-        local rootPart = targetPlayer.Character.HumanoidRootPart
-        local vector2, onScreen = workspace.CurrentCamera:WorldToViewportPoint(rootPart.Position)
-        
-        if onScreen then
-            textLabel.Visible = true
-            textLabel.Position = UDim2.new(0, vector2.X - 100, 0, vector2.Y - 50)
-            
-            local humanoid = targetPlayer.Character:FindFirstChild("Humanoid")
-            local health = humanoid and math.floor(humanoid.Health) or 0
-            
-            textLabel.Text = string.format("%s | ❤️ %d | %.0fm", 
-                targetPlayer.Name, 
-                health,
-                (rootPart.Position - (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position or Vector3.new())).Magnitude / 10
-            )
-            
-            -- Цвет здоровья
-            if health < 30 then
-                textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-            elseif health < 70 then
-                textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-            else
-                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-            end
-        else
-            textLabel.Visible = false
-        end
-    end)
-    
-    return textLabel
+-- GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "VanezyESP"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 220, 0, 120)
+Frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "Vanezy Script Universal Esp"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextScaled = true
+
+local Toggle = Instance.new("TextButton", Frame)
+Toggle.Size = UDim2.new(0, 160, 0, 40)
+Toggle.Position = UDim2.new(0.5, -80, 0.6, 0)
+Toggle.Text = "ON"
+Toggle.BackgroundColor3 = Color3.fromRGB(0,200,0)
+Toggle.TextScaled = true
+
+-- Найти любую часть персонажа (если нет Head)
+local function getPart(char)
+    return char:FindFirstChild("Head")
+        or char:FindFirstChild("HumanoidRootPart")
+        or char:FindFirstChildWhichIsA("BasePart")
 end
 
--- Отслеживаем появление игроков
-local espLabels = {}
+-- ESP
+local function addESP(char, player)
+    if not ESPEnabled then return end
+    if not char or not char.Parent then return end
 
-local function onPlayerAdded(player)
-    if player == LocalPlayer then return end
-    
-    -- Ждём появления персонажа
-    player.CharacterAdded:Connect(function(character)
-        -- Небольшая задержка для загрузки
-        task.wait(0.5)
-        if espLabels[player] then
-            espLabels[player]:Destroy()
-        end
-        espLabels[player] = createESP(player)
-    end)
-    
-    -- Если персонаж уже есть
-    if player.Character then
-        task.wait(0.5)
-        espLabels[player] = createESP(player)
+    local part = getPart(char)
+    if not part then return end
+
+    -- Highlight (если не удаляется игрой)
+    if not char:FindFirstChild("ESP") then
+        local h = Instance.new("Highlight")
+        h.Name = "ESP"
+        h.FillColor = Color3.fromRGB(0,255,0)
+        h.OutlineColor = Color3.new(1,1,1)
+        h.FillTransparency = 0.5
+        pcall(function()
+            h.Parent = char
+        end)
+    end
+
+    -- Ник
+    if not part:FindFirstChild("ESP_NAME") then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ESP_NAME"
+        billboard.Size = UDim2.new(0, 100, 0, 40)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = part
+
+        local text = Instance.new("TextLabel", billboard)
+        text.Size = UDim2.new(1,0,1,0)
+        text.BackgroundTransparency = 1
+        text.Text = player.Name
+        text.TextColor3 = Color3.new(1,1,1)
+        text.TextStrokeTransparency = 0
     end
 end
 
-local function onPlayerRemoving(player)
-    if espLabels[player] then
-        espLabels[player]:Destroy()
-        espLabels[player] = nil
+local function removeESP(char)
+    if char:FindFirstChild("ESP") then
+        char.ESP:Destroy()
+    end
+    for _, v in pairs(char:GetDescendants()) do
+        if v.Name == "ESP_NAME" then
+            v:Destroy()
+        end
     end
 end
 
--- Подключаем для существующих игроков
-for _, player in pairs(Players:GetPlayers()) do
-    onPlayerAdded(player)
-end
-
--- Подключаем события
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
-
--- ESP для самого игрока (опционально)
-local function localPlayerESP()
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(0, 200, 0, 30)
-    textLabel.BackgroundTransparency = 0.5
-    textLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textLabel.Text = "ВЫ"
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 14
-    textLabel.Parent = screenGui
-    
-    RunService.RenderStepped:Connect(function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local rootPart = LocalPlayer.Character.HumanoidRootPart
-            local vector2, onScreen = workspace.CurrentCamera:WorldToViewportPoint(rootPart.Position)
-            
-            if onScreen then
-                textLabel.Visible = true
-                textLabel.Position = UDim2.new(0, vector2.X - 100, 0, vector2.Y - 50)
+-- Постоянное обновление (если игра удаляет ESP — вернёт обратно)
+RunService.RenderStepped:Connect(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            if ESPEnabled then
+                addESP(player.Character, player)
             else
-                textLabel.Visible = false
+                removeESP(player.Character)
             end
         end
-    end)
-end
+    end
+end)
 
-localPlayerESP()
+-- Кнопка
+Toggle.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
 
--- Создаём кнопку включения/выключения ESP
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 120, 0, 40)
-toggleBtn.Position = UDim2.new(0, 10, 0, 50)
-toggleBtn.Text = "ESP: ON"
-toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Parent = screenGui
-
-local espEnabled = true
-toggleBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    toggleBtn.Text = espEnabled and "ESP: ON" or "ESP: OFF"
-    
-    for _, label in pairs(espLabels) do
-        if label then
-            label.Visible = espEnabled
-        end
+    if ESPEnabled then
+        Toggle.Text = "ON"
+        Toggle.BackgroundColor3 = Color3.fromRGB(0,200,0)
+    else
+        Toggle.Text = "OFF"
+        Toggle.BackgroundColor3 = Color3.fromRGB(255,0,0)
     end
 end)
