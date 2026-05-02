@@ -21,7 +21,8 @@ local settings = {
     espEnabled = true,
     autoWalk = false,
     menuColor = Color3.fromRGB(0, 150, 255),
-    rainbow = false
+    rainbow = false,
+    minimized = false
 }
 
 -- // СОЗДАНИЕ GUI (МИНИ-МЕНЮ)
@@ -71,7 +72,7 @@ loadTweenOut:Play()
 task.wait(0.5)
 loadingFrame:Destroy()
 
--- // ОСНОВНОЕ МЕНЮ (теперь оно "вырастает")
+-- // ОСНОВНОЕ МЕНЮ
 local menuFrame = Instance.new("Frame")
 menuFrame.Size = UDim2.new(0, 220, 0, 280)
 menuFrame.Position = UDim2.new(0.5, -110, 0.6, -140)
@@ -96,7 +97,7 @@ outline.Thickness = 1.5
 outline.Transparency = 0.3
 outline.Parent = menuFrame
 
--- // ЦВЕТНАЯ ПОЛОСА (для радуги)
+-- // ЦВЕТНАЯ ПОЛОСА
 local colorBar = Instance.new("Frame")
 colorBar.Size = UDim2.new(1, 0, 0, 3)
 colorBar.Position = UDim2.new(0, 0, 0, 0)
@@ -104,26 +105,157 @@ colorBar.BackgroundColor3 = settings.menuColor
 colorBar.BorderSizePixel = 0
 colorBar.Parent = menuFrame
 
--- // ЗАГОЛОВОК ДЛЯ ПЕРЕТАСКИВАНИЯ (Mobile Drag)
+-- // ЗАГОЛОВОК
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.Size = UDim2.new(1, 0, 0, 35)
 titleBar.BackgroundTransparency = 1
 titleBar.Parent = menuFrame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 1, 0)
+title.Size = UDim2.new(0.7, 0, 1, 0)
+title.Position = UDim2.new(0.05, 0, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "✨ NEBULA ✨"
 title.TextColor3 = settings.menuColor
 title.TextScaled = true
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.Font = Enum.Font.GothamBold
 title.Parent = titleBar
 
--- Drag logic (для мобилы и ПК)
+-- // КНОПКА СВОРАЧИВАНИЯ
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(0.78, 0, 0, 2.5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 55)
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(200, 210, 255)
+minimizeBtn.TextSize = 20
+minimizeBtn.TextScaled = true
+minimizeBtn.Font = Enum.Font.GothamBold
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 6)
+minCorner.Parent = minimizeBtn
+minimizeBtn.Parent = titleBar
+
+-- // КНОПКА ЗАКРЫТИЯ (КРЕСТИК)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(0.86, 0, 0, 2.5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 20
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeBtn
+closeBtn.Parent = titleBar
+
+-- // КНОПКА ВОССТАНОВЛЕНИЯ (появляется в свёрнутом режиме)
+local restoreBtn = Instance.new("TextButton")
+restoreBtn.Size = UDim2.new(0, 50, 0, 50)
+restoreBtn.Position = UDim2.new(0.5, -25, 0.8, 0)
+restoreBtn.BackgroundColor3 = Color3.fromRGB(18, 22, 40)
+restoreBtn.BackgroundTransparency = 0.2
+restoreBtn.Text = "✨"
+restoreBtn.TextColor3 = settings.menuColor
+restoreBtn.TextSize = 30
+restoreBtn.Visible = false
+local restoreCorner = Instance.new("UICorner")
+restoreCorner.CornerRadius = UDim.new(1, 0)
+restoreCorner.Parent = restoreBtn
+local restoreStroke = Instance.new("UIStroke")
+restoreStroke.Color = settings.menuColor
+restoreStroke.Thickness = 1.5
+restoreStroke.Parent = restoreBtn
+restoreBtn.Parent = screenGui
+
+-- // АНИМАЦИЯ СВОРАЧИВАНИЯ
+local function minimizeMenu()
+    if settings.minimized then return end
+    settings.minimized = true
+    
+    local minimizeTween = TweenService:Create(menuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 50, 0, 50),
+        BackgroundTransparency = 0.3
+    })
+    minimizeTween:Play()
+    
+    task.wait(0.2)
+    -- Скрываем содержимое
+    for _, child in pairs(menuFrame:GetChildren()) do
+        if child ~= titleBar and child ~= colorBar and child ~= outline then
+            child.Visible = false
+        end
+    end
+    titleBar.Visible = false
+    colorBar.Visible = false
+    
+    restoreBtn.Visible = true
+    restoreBtn.BackgroundTransparency = 0.2
+    local restoreAppear = TweenService:Create(restoreBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        BackgroundTransparency = 0.2,
+        Size = UDim2.new(0, 55, 0, 55)
+    })
+    restoreAppear:Play()
+end
+
+local function restoreMenu()
+    if not settings.minimized then return end
+    settings.minimized = false
+    
+    restoreBtn.Visible = false
+    
+    -- Показываем элементы обратно
+    for _, child in pairs(menuFrame:GetChildren()) do
+        if child ~= titleBar and child ~= colorBar and child ~= outline then
+            child.Visible = true
+        end
+    end
+    titleBar.Visible = true
+    colorBar.Visible = true
+    
+    local restoreTween = TweenService:Create(menuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 220, 0, 280),
+        BackgroundTransparency = 0.1
+    })
+    restoreTween:Play()
+end
+
+local function closeMenu()
+    local closeTween = TweenService:Create(menuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1
+    })
+    closeTween:Play()
+    
+    local restoreClose = TweenService:Create(restoreBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1
+    })
+    restoreClose:Play()
+    
+    task.wait(0.3)
+    screenGui:Destroy() -- Полное удаление GUI
+    
+    -- Очистка ESP и эффектов
+    if espFolder then espFolder:Destroy() end
+    if flyBodyVel then flyBodyVel:Destroy() end
+    if levBodyPos then levBodyPos:Destroy() end
+end
+
+-- Назначаем кнопки
+minimizeBtn.MouseButton1Click:Connect(minimizeMenu)
+closeBtn.MouseButton1Click:Connect(closeMenu)
+restoreBtn.MouseButton1Click:Connect(restoreMenu)
+
+-- // DRAG ЛОГИКА (только когда не свёрнуто)
 local dragging = false
 local dragStart, startPos
 
 titleBar.InputBegan:Connect(function(input)
+    if settings.minimized then return end
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
@@ -132,7 +264,7 @@ titleBar.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+    if dragging and not settings.minimized and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         local delta = input.Position - dragStart
         menuFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
@@ -143,6 +275,10 @@ UserInputService.InputEnded:Connect(function(input)
         dragging = false
     end
 end)
+
+-- // ОСТАЛЬНОЙ КОД (СЛАЙДЕРЫ, ТОГГЛЫ, ESP, FLY и т.д.)
+-- [ВСТАВЬ СЮДА ВЕСЬ ОСТАЛЬНОЙ КОД ИЗ ПРЕДЫДУЩЕГО СООБЩЕНИЯ, НАЧИНАЯ С createSlider И ДО КОНЦА]
+-- Я скопирую его ниже для целостности:
 
 -- // ФУНКЦИЯ СОЗДАНИЯ СЛАЙДЕРА
 local function createSlider(parent, text, minVal, maxVal, defaultVal, callback, step)
@@ -275,7 +411,7 @@ local function createToggle(parent, text, default, callback)
     callback(default)
 end
 
--- // КНОПКА ВЫБОРА ЦВЕТА
+-- // КНОПКИ ЦВЕТА
 local colorBtn = Instance.new("TextButton")
 colorBtn.Size = UDim2.new(0.42, 0, 0, 30)
 colorBtn.Position = UDim2.new(0.05, 0, 0, 0)
@@ -314,17 +450,18 @@ local function startRainbow()
             settings.menuColor = col
             outline.Color = col
             colorBar.BackgroundColor3 = col
+            restoreStroke.Color = col
+            restoreBtn.TextColor3 = col
             for _, child in pairs(menuFrame:GetDescendants()) do
-                if child:IsA("Frame") and (child.Name == "fill" or child.Name == "knob" or child.BackgroundColor3 == settings.menuColor) then
-                    if child.Name ~= "colorBar" and child ~= colorBar then
-                        pcall(function() child.BackgroundColor3 = col end)
-                    end
+                if child:IsA("Frame") and (child.Name == "fill" or child.Name == "knob") then
+                    pcall(function() child.BackgroundColor3 = col end)
                 end
                 if child:IsA("TextLabel") and child.Text:find("NEBULA") then
                     child.TextColor3 = col
                 end
             end
             colorBar.BackgroundColor3 = col
+            updateESP()
         end
     end)
 end
@@ -340,8 +477,11 @@ rainbowBtn.MouseButton1Click:Connect(function()
         settings.menuColor = Color3.fromRGB(0, 150, 255)
         outline.Color = settings.menuColor
         colorBar.BackgroundColor3 = settings.menuColor
+        restoreStroke.Color = settings.menuColor
+        restoreBtn.TextColor3 = settings.menuColor
         rainbowBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
         rainbowBtn.Text = "✨ RAINBOW"
+        updateESP()
     end
 end)
 
@@ -350,12 +490,13 @@ colorBtn.MouseButton1Click:Connect(function()
     if rainbowTask then rainbowTask:Disconnect() rainbowTask = nil end
     rainbowBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
     rainbowBtn.Text = "✨ RAINBOW"
-    -- Простой выбор предустановок
     local colors = {Color3.fromRGB(0,150,255), Color3.fromRGB(0,255,200), Color3.fromRGB(100,100,255), Color3.fromRGB(0,200,255)}
     local newCol = colors[(math.random(1,#colors))]
     settings.menuColor = newCol
     outline.Color = newCol
     colorBar.BackgroundColor3 = newCol
+    restoreStroke.Color = newCol
+    restoreBtn.TextColor3 = newCol
     for _, child in pairs(menuFrame:GetDescendants()) do
         if child:IsA("Frame") and (child.Name == "fill" or child.Name == "knob") then
             pcall(function() child.BackgroundColor3 = newCol end)
@@ -364,16 +505,17 @@ colorBtn.MouseButton1Click:Connect(function()
             child.TextColor3 = newCol
         end
     end
+    updateESP()
 end)
 
--- // СКРОЛЛИНГ ДЛЯ МЕНЮ
+-- // СКРОЛЛИНГ
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1, 0, 1, -40)
 scroll.Position = UDim2.new(0, 0, 0, 35)
 scroll.BackgroundTransparency = 1
 scroll.ScrollBarThickness = 3
 scroll.ScrollBarImageColor3 = settings.menuColor
-scroll.CanvasSize = UDim2.new(0, 0, 0, 280)
+scroll.CanvasSize = UDim2.new(0, 0, 0, 310)
 scroll.Parent = menuFrame
 
 local layout = Instance.new("UIListLayout")
@@ -387,7 +529,7 @@ createSlider(scroll, "🔸 Jump Power", 40, 200, 50, function(v) settings.jumpPo
 createToggle(scroll, "🕊️ Fly Mode", false, function(v) settings.fly = v; if not v then settings.levitation = false end end)
 createToggle(scroll, "🧘 Levitation", false, function(v) settings.levitation = v; if v then settings.fly = false end end)
 createToggle(scroll, "🦿 Auto Walk", false, function(v) settings.autoWalk = v end)
-createToggle(scroll, "👁️ ESP (Players)", true, function(v) settings.espEnabled = v end)
+createToggle(scroll, "👁️ ESP (Players)", true, function(v) settings.espEnabled = v; updateESP() end)
 
 -- // ESP
 local espFolder = Instance.new("Folder")
@@ -426,17 +568,14 @@ RunService.RenderStepped:Connect(function(dt)
     local humanoid = char:FindFirstChild("Humanoid")
     if not hrp or not humanoid then return end
     
-    -- Speed
     humanoid.WalkSpeed = settings.speed
     humanoid.JumpPower = settings.jumpPower
     
-    -- Auto Walk
     if settings.autoWalk then
         local moveDir = (camera.CFrame.LookVector * Vector3.new(1,0,1)).Unit
         humanoid:Move(moveDir, true)
     end
     
-    -- Fly
     if settings.fly then
         if not flyBodyVel then
             flyBodyVel = Instance.new("BodyVelocity")
@@ -460,7 +599,6 @@ RunService.RenderStepped:Connect(function(dt)
         humanoid.PlatformStand = false
     end
     
-    -- Levitation (удержание в воздухе)
     if settings.levitation and not settings.fly then
         if not levBodyPos then
             levBodyPos = Instance.new("BodyPosition")
@@ -476,28 +614,4 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Обновление ESP цвета при радуге
-if rainbowTask then
-    local oldFunc = rainbowTask
-    rainbowTask = RunService.RenderStepped:Connect(function()
-        if settings.rainbow then
-            rainbowHue = (rainbowHue + 0.005) % 1
-            settings.menuColor = Color3.fromHSV(rainbowHue, 1, 1)
-            updateESP()
-        end
-    end)
-end
-
--- Скрыть меню по кнопке (тап по заголовку или долгое нажатие)
-local menuVisible = true
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch and input.UserInputState == Enum.UserInputState.Begin then
-        task.wait(0.3)
-        if UserInputService:GetFingerPositions()[1] then
-            menuVisible = not menuVisible
-            menuFrame.Visible = menuVisible
-        end
-    end
-end)
-
-print("✅ Скрипт загружен! Тап/клик по заголовку NEBULA - скрыть/показать меню.")
+print("✅ Скрипт загружен! ✕ - закрыть, − - свернуть")
