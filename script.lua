@@ -1,18 +1,24 @@
 --[[
-	SYNAPSE HUB v11 - FULL ULTIMATE
+	SYNAPSE HUB v12 - FULLY WORKING
 	by Vanezy Scripts
 	Telegram: @VanezyScripts
 ]]
+
+print("START - Synapse Hub v12")
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local GuiService = game:GetService("GuiService")
-local Clipboard = game:GetService("Clipboard") or setclipboard or function() end
 
 local player = Players.LocalPlayer
+if not player then
+	player = Players.PlayerAdded:Wait()
+end
+
+-- =========== ИСПРАВЛЕННЫЙ CLIPBOARD ===========
+local Clipboard = setclipboard or toclipboard or function() end
 
 -- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ===========
 local settings = {
@@ -66,23 +72,26 @@ local noClipConnection = nil
 local bodyVelocity = nil
 local rainbowHue = 0
 local rainbowConnection = nil
+local espConnection = nil
 
 local espPlayersList = {}
 local espChestsList = {}
 local espMobsList = {}
 
--- =========== БЕЗОПАСНОЕ СОЗДАНИЕ GUI ===========
+-- =========== ИСПРАВЛЕННОЕ СОЗДАНИЕ GUI ===========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SynapseHub"
 ScreenGui.ResetOnSpawn = false
 
-local playerGui = player:FindFirstChild("PlayerGui")
-if not playerGui then
-	playerGui = Instance.new("PlayerGui")
-	playerGui.Parent = player
-	task.wait(0.5)
+local playerGui = player:WaitForChild("PlayerGui")
+
+pcall(function()
+	ScreenGui.Parent = playerGui
+end)
+
+if not ScreenGui.Parent then
+	ScreenGui.Parent = playerGui
 end
-ScreenGui.Parent = playerGui
 
 -- =========== РЕКЛАМА ===========
 local AdFrame = Instance.new("Frame")
@@ -170,24 +179,13 @@ closeCorner.Parent = CloseAdButton
 local adAppear = TweenService:Create(AdFrame, TweenInfo.new(0.5), {BackgroundTransparency = 0.05})
 adAppear:Play()
 
--- Кнопка Telegram - копирует ссылку и пытается открыть
+-- Кнопка Telegram - только копирует ссылку (без MessageBox)
 TelegramButton.MouseButton1Click:Connect(function()
-	local success, err = pcall(function()
-		local telegramLink = "https://t.me/VanezyScripts"
-		if Clipboard and Clipboard.set then
-			Clipboard:set(telegramLink)
-		elseif setclipboard then
-			setclipboard(telegramLink)
-		elseif toclipboard then
-			toclipboard(telegramLink)
-		end
-		print("✅ Ссылка скопирована: " .. telegramLink)
+	local telegramLink = "https://t.me/VanezyScripts"
+	pcall(function()
+		Clipboard(telegramLink)
 	end)
-	if GuiService and GuiService.ShowMessageBox then
-		pcall(function()
-			GuiService:ShowMessageBox("Ссылка скопирована!\nhttps://t.me/VanezyScripts", "OK", "")
-		end)
-	end
+	print("✅ Ссылка скопирована: " .. telegramLink)
 end)
 
 -- Таймер 5 секунд
@@ -543,7 +541,7 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 	knobCorner.CornerRadius = UDim.new(1, 0)
 	knobCorner.Parent = knob
 	
-	local dragging = false
+	local isDragging = false
 	local currentVal = defaultVal
 	
 	local function updateSlider(input)
@@ -563,26 +561,26 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 	
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
+			isDragging = true
 		end
 	end)
 	
 	bar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
+			isDragging = true
 			updateSlider(input)
 		end
 	end)
 	
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+		if isDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
 			updateSlider(input)
 		end
 	end)
 	
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
+			isDragging = false
 		end
 	end)
 	
@@ -819,18 +817,21 @@ yOffset = yOffset + 45
 local espPlayersToggle, getEspPlayersState = createToggle(Content, "ESP Players", yOffset, settings.espPlayers, function(v)
 	settings.espPlayers = v
 	saveValue("espPlayers", v)
+	updateESP()
 end)
 yOffset = yOffset + 50
 
 local espChestsToggle, getEspChestsState = createToggle(Content, "ESP Chests", yOffset, settings.espChests, function(v)
 	settings.espChests = v
 	saveValue("espChests", v)
+	updateESP()
 end)
 yOffset = yOffset + 50
 
 local espMobsToggle, getEspMobsState = createToggle(Content, "ESP Mobs", yOffset, settings.espMobs, function(v)
 	settings.espMobs = v
 	saveValue("espMobs", v)
+	updateESP()
 end)
 yOffset = yOffset + 50
 
@@ -968,6 +969,8 @@ ResetBtn.MouseButton1Click:Connect(function()
 		end
 	end
 	
+	updateESP()
+	
 	ResetBtn.Text = "✓ RESET!"
 	TweenService:Create(ResetBtn, TweenInfo.new(1.5), {TextColor3 = Color3.fromRGB(150, 255, 150)}):Play()
 	task.wait(1.5)
@@ -996,22 +999,15 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -- =========== ФУНКЦИЯ ESP ===========
-local espConnectionESP = nil
-
-local function updateESP()
-	if espConnectionESP then
-		espConnectionESP:Disconnect()
-		espConnectionESP = nil
+function updateESP()
+	if espConnection then
+		espConnection:Disconnect()
+		espConnection = nil
 	end
 	
 	if not (settings.espPlayers or settings.espChests or settings.espMobs) then return end
 	
-	espConnectionESP = RunService.Heartbeat:Connect(function()
-		if not (settings.espPlayers or settings.espChests or settings.espMobs) then return end
-		
-		local myChar = player.Character
-		local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-		
+	espConnection = RunService.Heartbeat:Connect(function()
 		-- ESP Players
 		if settings.espPlayers then
 			for _, plr in pairs(Players:GetPlayers()) do
@@ -1022,8 +1018,7 @@ local function updateESP()
 				local hum = char:FindFirstChild("Humanoid")
 				if not hrp then continue end
 				
-				local existing = espPlayersList[plr.UserId]
-				if not existing then
+				if not espPlayersList[plr.UserId] then
 					local hl = Instance.new("Highlight")
 					hl.FillColor = Color3.fromRGB(255, 50, 50)
 					hl.FillTransparency = 0.5
@@ -1033,12 +1028,13 @@ local function updateESP()
 					hl.Adornee = char
 					hl.Parent = char
 					
+					local head = char:FindFirstChild("Head") or hrp
 					local bill = Instance.new("BillboardGui")
-					bill.Size = UDim2.new(0, 200, 0, 50)
+					bill.Size = UDim2.new(0, 200 * settings.espSize, 0, 50 * settings.espSize)
 					bill.StudsOffset = Vector3.new(0, 2.5, 0)
 					bill.AlwaysOnTop = true
 					bill.MaxDistance = 500
-					bill.Parent = char:FindFirstChild("Head") or hrp
+					bill.Parent = head
 					
 					local frame = Instance.new("Frame")
 					frame.Size = UDim2.new(1, 0, 1, 0)
@@ -1082,20 +1078,26 @@ local function updateESP()
 				
 				local data = espPlayersList[plr.UserId]
 				if data then
+					if data.billboard then
+						data.billboard.Size = UDim2.new(0, 200 * settings.espSize, 0, 50 * settings.espSize)
+					end
+					
 					if settings.espHealth and hum then
-						local hp = hum.Health
-						local maxHp = hum.MaxHealth
-						local percent = (hp / maxHp) * 100
-						data.health.Text = string.format("❤️ %.0f%%", percent)
+						local hp = math.floor(hum.Health)
+						data.health.Text = "❤️ " .. hp
 						data.health.Visible = true
 					elseif data.health then
 						data.health.Visible = false
 					end
 					
-					if settings.espDistance and myRoot then
-						local dist = (myRoot.Position - hrp.Position).Magnitude
-						data.distance.Text = string.format("%.1f m", dist)
-						data.distance.Visible = true
+					if settings.espDistance then
+						local myChar = player.Character
+						local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+						if myRoot then
+							local dist = (myRoot.Position - hrp.Position).Magnitude
+							data.distance.Text = string.format("%.1f m", dist)
+							data.distance.Visible = true
+						end
 					elseif data.distance then
 						data.distance.Visible = false
 					end
@@ -1109,12 +1111,11 @@ local function updateESP()
 			end
 		end
 		
-		-- ESP Chests (Suspicious Блоки)
+		-- ESP Chests
 		if settings.espChests then
 			for _, obj in pairs(Workspace:GetDescendants()) do
-				if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("crate") or obj.Name:lower():find("barrel")) then
-					local existing = espChestsList[obj]
-					if not existing then
+				if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("crate") or obj.Name:lower():find("barrel") or obj.Name:lower():find("box")) then
+					if not espChestsList[obj] then
 						local hl = Instance.new("Highlight")
 						hl.FillColor = Color3.fromRGB(255, 200, 50)
 						hl.FillTransparency = 0.4
@@ -1133,12 +1134,11 @@ local function updateESP()
 			end
 		end
 		
-		-- ESP Mobs (NPC/Enemies)
+		-- ESP Mobs
 		if settings.espMobs then
 			for _, obj in pairs(Workspace:GetDescendants()) do
-				if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= myChar then
-					local existing = espMobsList[obj]
-					if not existing then
+				if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= player.Character then
+					if not espMobsList[obj] then
 						local hl = Instance.new("Highlight")
 						hl.FillColor = Color3.fromRGB(255, 100, 255)
 						hl.FillTransparency = 0.5
@@ -1156,24 +1156,11 @@ local function updateESP()
 				espMobsList[obj] = nil
 			end
 		end
-		
-		-- ESP Size
-		local espSize = settings.espSize
-		for _, data in pairs(espPlayersList) do
-			if data.billboard then
-				data.billboard.Size = UDim2.new(0, 200 * espSize, 0, 50 * espSize)
-			end
-		end
 	end)
 end
 
 -- Запускаем ESP
 updateESP()
-
--- Подписываемся на изменения
-for _, event in pairs({Players.PlayerAdded, Players.PlayerRemoving}) do
-	event:Connect(function() task.wait(0.5) updateESP() end)
-end
 
 -- =========== ОБРАБОТКА ПЕРЕЗАХОДА ===========
 player.CharacterAdded:Connect(function(char)
@@ -1228,7 +1215,7 @@ player.CharacterAdded:Connect(function(char)
 	end
 end)
 
--- =========== АВТОЗАПУСК ФУНКЦИЙ (Auto Start) ===========
+-- =========== АВТОЗАПУСК ФУНКЦИЙ ===========
 local autoStart = loadValue("AutoStart", true)
 
 if autoStart then
@@ -1311,5 +1298,5 @@ CloseBtn.MouseButton1Click:Connect(function()
 	ScreenGui:Destroy()
 end)
 
-print("✅ Synapse Hub v11 loaded!")
+print("✅ Synapse Hub v12 loaded successfully!")
 print("📢 Telegram: @VanezyScripts")
