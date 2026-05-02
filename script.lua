@@ -1,186 +1,227 @@
--- Vanezy UI (Studio / Dev Tool)
+-- Vanezy Pro Dev UI (Studio version)
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
 
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local lp = Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local cam = workspace.CurrentCamera
 
 ------------------------------------------------
 -- GUI
 ------------------------------------------------
 local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "VanezyUI"
+gui.Name = "VanezyProUI"
 
 ------------------------------------------------
--- WHITE LOADING (NO BACKGROUND)
+-- LOADING
 ------------------------------------------------
-local loadText = Instance.new("TextLabel", gui)
-loadText.Size = UDim2.new(0,200,0,50)
-loadText.Position = UDim2.new(0.5,-100,0.5,-25)
-loadText.BackgroundTransparency = 1
-loadText.Text = "loading..."
-loadText.TextColor3 = Color3.new(1,1,1)
-loadText.TextTransparency = 1
-loadText.TextScaled = true
+local load = Instance.new("TextLabel", gui)
+load.Size = UDim2.new(0,220,0,50)
+load.Position = UDim2.new(0.5,-110,0.5,-25)
+load.BackgroundTransparency = 1
+load.Text = "loading..."
+load.TextColor3 = Color3.new(1,1,1)
+load.TextScaled = true
+load.TextTransparency = 1
 
-TweenService:Create(loadText, TweenInfo.new(0.5), {
-    TextTransparency = 0
-}):Play()
-
-task.wait(1.5)
-
-TweenService:Create(loadText, TweenInfo.new(0.5), {
-    TextTransparency = 1
-}):Play()
-
+TweenService:Create(load, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+task.wait(1.2)
+TweenService:Create(load, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
 task.wait(0.6)
-loadText:Destroy()
+load:Destroy()
 
 ------------------------------------------------
--- MAIN MENU
+-- MAIN FRAME
 ------------------------------------------------
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,260,0,180)
+frame.Size = UDim2.new(0,320,0,240)
 frame.Position = UDim2.new(0.1,0,0.3,0)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.BackgroundTransparency = 1
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
 
-TweenService:Create(frame, TweenInfo.new(0.5), {
+TweenService:Create(frame, TweenInfo.new(0.4), {
     BackgroundTransparency = 0
 }):Play()
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,30)
+------------------------------------------------
+-- TOP BAR
+------------------------------------------------
+local top = Instance.new("Frame", frame)
+top.Size = UDim2.new(1,0,0,30)
+top.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+local title = Instance.new("TextLabel", top)
+title.Size = UDim2.new(1,0,1,0)
 title.BackgroundTransparency = 1
-title.Text = "Vanezy Dev Menu"
+title.Text = "Vanezy Pro Menu"
 title.TextColor3 = Color3.new(1,1,1)
 
 ------------------------------------------------
--- CLOSE
+-- TABS
 ------------------------------------------------
-local close = Instance.new("TextButton", frame)
-close.Size = UDim2.new(0,30,0,30)
-close.Position = UDim2.new(1,-30,0,0)
-close.Text = "X"
-close.BackgroundColor3 = Color3.fromRGB(200,0,0)
+local mainTab = Instance.new("TextButton", frame)
+mainTab.Size = UDim2.new(0,160,0,25)
+mainTab.Position = UDim2.new(0,0,0,30)
+mainTab.Text = "Main"
 
-close.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
-
-------------------------------------------------
--- MINIMIZE
-------------------------------------------------
-local mini = Instance.new("TextButton", frame)
-mini.Size = UDim2.new(0,30,0,30)
-mini.Position = UDim2.new(1,-60,0,0)
-mini.Text = "-"
-mini.BackgroundColor3 = Color3.fromRGB(120,120,120)
-
-local minimized = false
-
-mini.MouseButton1Click:Connect(function()
-    minimized = not minimized
-
-    if minimized then
-        frame.Size = UDim2.new(0,260,0,30)
-        toggleESP.Visible = false
-    else
-        frame.Size = UDim2.new(0,260,0,180)
-        toggleESP.Visible = true
-    end
-end)
+local themeTab = Instance.new("TextButton", frame)
+themeTab.Size = UDim2.new(0,160,0,25)
+themeTab.Position = UDim2.new(0.5,0,0,30)
+themeTab.Text = "Theme"
 
 ------------------------------------------------
--- ESP TOGGLE (DEV ONLY)
+-- MAIN PAGE
 ------------------------------------------------
-local ESPEnabled = false
+local main = Instance.new("Frame", frame)
+main.Size = UDim2.new(1,0,1,-55)
+main.Position = UDim2.new(0,0,0,55)
+main.BackgroundTransparency = 1
 
-local toggleESP = Instance.new("TextButton", frame)
-toggleESP.Size = UDim2.new(0,220,0,40)
-toggleESP.Position = UDim2.new(0.5,-110,0.5,0)
-toggleESP.Text = "ESP OFF"
-toggleESP.BackgroundColor3 = Color3.fromRGB(200,0,0)
+------------------------------------------------
+-- THEME PAGE
+------------------------------------------------
+local theme = Instance.new("Frame", frame)
+theme.Size = main.Size
+theme.Position = main.Position
+theme.BackgroundTransparency = 1
+theme.Visible = false
 
-local function getPart(char)
-    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+------------------------------------------------
+-- BUTTONS
+------------------------------------------------
+local function btn(text, y)
+    local b = Instance.new("TextButton", main)
+    b.Size = UDim2.new(0,280,0,30)
+    b.Position = UDim2.new(0.5,-140,0,y)
+    b.Text = text
+    b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    return b
 end
 
-local function addESP(plr, char)
-    if not ESPEnabled then return end
-    if char:FindFirstChild("DEV_ESP") then return end
+local espBtn = btn("ESP OFF", 0)
+local autoBtn = btn("AutoWalk OFF", 0.2)
+local speedBtn = btn("Speed: 16", 0.4)
+local jumpBtn = btn("Jump: 50", 0.6)
+local fovBtn = btn("FOV: 70", 0.8)
 
-    local h = Instance.new("Highlight")
-    h.Name = "DEV_ESP"
-    h.FillColor = Color3.fromRGB(0,255,0)
-    h.OutlineColor = Color3.new(1,1,1)
-    h.Parent = char
+------------------------------------------------
+-- THEME BUTTONS
+------------------------------------------------
+local function tbtn(name, color, y)
+    local b = Instance.new("TextButton", theme)
+    b.Size = UDim2.new(0,280,0,30)
+    b.Position = UDim2.new(0.5,-140,0,y)
+    b.Text = name
+    b.BackgroundColor3 = color
 
-    local part = getPart(char)
-    if not part then return end
-
-    local bb = Instance.new("BillboardGui", part)
-    bb.Size = UDim2.new(0,120,0,50)
-    bb.AlwaysOnTop = true
-
-    local text = Instance.new("TextLabel", bb)
-    text.Size = UDim2.new(1,0,1,0)
-    text.BackgroundTransparency = 1
-    text.TextColor3 = Color3.new(1,1,1)
-    text.TextScaled = true
-
-    RunService.RenderStepped:Connect(function()
-        if char and char:FindFirstChild("Humanoid") and Character and Character:FindFirstChild("HumanoidRootPart") then
-            local hp = math.floor(char.Humanoid.Health)
-            local dist = math.floor((part.Position - Character.HumanoidRootPart.Position).Magnitude)
-
-            text.Text = plr.Name ..
-            "\nHP: "..hp..
-            "\nDist: "..dist
-        end
+    b.MouseButton1Click:Connect(function()
+        frame.BackgroundColor3 = color
     end)
 end
 
-toggleESP.MouseButton1Click:Connect(function()
-    ESPEnabled = not ESPEnabled
+tbtn("Red", Color3.fromRGB(120,0,0), 0)
+tbtn("Blue", Color3.fromRGB(0,0,120), 0.2)
+tbtn("Green", Color3.fromRGB(0,120,0), 0.4)
+tbtn("Yellow", Color3.fromRGB(120,120,0), 0.6)
 
-    if ESPEnabled then
-        toggleESP.Text = "ESP ON"
-        toggleESP.BackgroundColor3 = Color3.fromRGB(0,200,0)
-    else
-        toggleESP.Text = "ESP OFF"
-        toggleESP.BackgroundColor3 = Color3.fromRGB(200,0,0)
+------------------------------------------------
+-- SYSTEMS
+------------------------------------------------
+local ESP = false
+local auto = false
+local speed = 16
+local jump = 50
+local fov = 70
+
+------------------------------------------------
+-- TOGGLES
+------------------------------------------------
+espBtn.MouseButton1Click:Connect(function()
+    ESP = not ESP
+    espBtn.Text = ESP and "ESP ON" or "ESP OFF"
+end)
+
+autoBtn.MouseButton1Click:Connect(function()
+    auto = not auto
+    autoBtn.Text = auto and "AutoWalk ON" or "AutoWalk OFF"
+end)
+
+speedBtn.MouseButton1Click:Connect(function()
+    speed += 4
+    speedBtn.Text = "Speed: "..speed
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speed
     end
+end)
 
-    for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            addESP(p, p.Character)
-        end
+jumpBtn.MouseButton1Click:Connect(function()
+    jump += 10
+    jumpBtn.Text = "Jump: "..jump
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.JumpPower = jump
+    end
+end)
+
+fovBtn.MouseButton1Click:Connect(function()
+    fov += 10
+    if fov > 120 then fov = 70 end
+    cam.FieldOfView = fov
+    fovBtn.Text = "FOV: "..fov
+end)
+
+------------------------------------------------
+-- TAB SWITCH
+------------------------------------------------
+mainTab.MouseButton1Click:Connect(function()
+    main.Visible = true
+    theme.Visible = false
+end)
+
+themeTab.MouseButton1Click:Connect(function()
+    main.Visible = false
+    theme.Visible = true
+end)
+
+------------------------------------------------
+-- AUTOWALK
+------------------------------------------------
+RunService.RenderStepped:Connect(function()
+    if auto and char and char:FindFirstChild("Humanoid") then
+        char.Humanoid:Move(Vector3.new(0,0,-1), true)
     end
 end)
 
 ------------------------------------------------
--- PLAYER HOOK
+-- ESP (DEV SIMPLE)
 ------------------------------------------------
+local function add(plr, c)
+    if not ESP then return end
+    if c:FindFirstChild("DEV") then return end
+
+    local h = Instance.new("Highlight", c)
+    h.Name = "DEV"
+    h.FillColor = Color3.fromRGB(0,255,0)
+end
+
 for _,p in pairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then
-        p.CharacterAdded:Connect(function(char)
+    if p ~= lp then
+        if p.Character then add(p, p.Character) end
+        p.CharacterAdded:Connect(function(c)
             task.wait(1)
-            addESP(p, char)
+            add(p,c)
         end)
     end
 end
 
 Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function(char)
+    p.CharacterAdded:Connect(function(c)
         task.wait(1)
-        addESP(p, char)
+        add(p,c)
     end)
 end)
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
+lp.CharacterAdded:Connect(function(c)
+    char = c
 end)
