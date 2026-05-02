@@ -1,8 +1,16 @@
 --[[
-  Vanezy Universal Mobile Script
-  Версия: 1.0 FULL
-  Платформа: Roblox (для телефона с поддержкой джойстика)
-  Все функции полностью реализованы
+  VANEZY UNIVERSAL MOBILE SCRIPT - FULL RELEASE
+  Версия: 2.0 COMPLETE
+  Все функции: Fly (джойстик + скорость + отдельные кнопки вверх/вниз)
+  ESP (игроки/сундуки/мобы/размер/ХП/расстояние)
+  Noclip (стены/пол/потолок отдельно)
+  Speed (ходьба слайдер + спидхак слайдер + автономный)
+  Jump (сила прыжка слайдер + бесконечные прыжки)
+  FOV слайдер, Автобег слайдер + тоггл
+  Радужный цвет + скорость радуги слайдер
+  Меню: перемещение пальцем, сворачивание, закрытие
+  Загрузочный экран "Script loading... by Vanezy" 2 сек
+  Адаптация под телефон (джойстик, тач-слайдеры)
 --]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -11,83 +19,89 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
--- Глобальные переменные
+-- Переменные состояния
 local flyEnabled = false
 local flySpeed = 50
-local bodyVelocity = nil
-local bodyGyro = nil
+local flyBodyVel = nil
+local flyBodyGyro = nil
+local flyControl = {Forward = 0, Right = 0, Up = 0}
+local flyConnection = nil
+
 local noclipEnabled = false
 local noclipWalls = false
 local noclipFloor = false
 local noclipCeiling = false
+local noclipConnection = nil
+
 local espEnabled = false
-local espChestEnabled = false
-local espMobEnabled = false
+local espChest = false
+local espMobs = false
 local espSize = 1
-local espHP = false
-local espDistance = false
+local espShowHP = false
+local espShowDist = false
+local espObjects = {}
+local espConnection = nil
+
 local speedHack = false
-local speedValue = 16
-local jumpPower = 50
+local speedHackValue = 16
+local walkSpeedValue = 16
+local jumpPowerValue = 50
 local infiniteJump = false
 local fovValue = 70
 local autoRun = false
 local autoRunSpeed = 16
-local walkSpeedValue = 16
-local flyControl = {Forward = 0, Right = 0, Up = 0}
+
+local rainbowEnabled = false
 local rainbowHue = 0
 local rainbowSpeed = 1
-local currentColor = Color3.fromRGB(255,255,255)
-local scriptVisible = true
-local minimized = false
-local espObjects = {}
-local flyConnection = nil
-local noclipConnection = nil
-local espConnection = nil
-local rainbowConnection = nil
+local currentSolidColor = Color3.fromRGB(255,255,255)
 
--- Цвета
-local colors = {
-    {Name = "Красный", Color = Color3.fromRGB(255,0,0)},
-    {Name = "Зелёный", Color = Color3.fromRGB(0,255,0)},
-    {Name = "Синий", Color = Color3.fromRGB(0,0,255)},
-    {Name = "Жёлтый", Color = Color3.fromRGB(255,255,0)},
-    {Name = "Фиолетовый", Color = Color3.fromRGB(255,0,255)},
-    {Name = "Оранжевый", Color = Color3.fromRGB(255,165,0)},
-    {Name = "Белый", Color = Color3.fromRGB(255,255,255)},
-    {Name = "Радужный", Color = "rainbow"}
+local guiVisible = true
+local guiMinimized = false
+
+-- Цвета для кнопки
+local colorOptions = {
+    {name = "Красный", color = Color3.fromRGB(255,0,0)},
+    {name = "Зелёный", color = Color3.fromRGB(0,255,0)},
+    {name = "Синий", color = Color3.fromRGB(0,0,255)},
+    {name = "Жёлтый", color = Color3.fromRGB(255,255,0)},
+    {name = "Фиолетовый", color = Color3.fromRGB(255,0,255)},
+    {name = "Оранжевый", color = Color3.fromRGB(255,165,0)},
+    {name = "Белый", color = Color3.fromRGB(255,255,255)},
+    {name = "Радужный", color = "rainbow"}
 }
+local currentColorIndex = 8
 
 -- UI элементы
 local screenGui = Instance.new("ScreenGui")
 local mainFrame = Instance.new("Frame")
 local topBar = Instance.new("Frame")
-local titleLabel = Instance.new("TextLabel")
-local authorLabel = Instance.new("TextLabel")
-local iconLabel = Instance.new("TextLabel")
-local closeBtn = Instance.new("TextButton")
-local minimizeBtn = Instance.new("TextButton")
-local colorBtn = Instance.new("TextButton")
-local rainbowSpeedSlider = Instance.new("Frame")
+local titleText = Instance.new("TextLabel")
+local authorText = Instance.new("TextLabel")
+local iconStar = Instance.new("TextLabel")
+local closeButton = Instance.new("TextButton")
+local minimizeButton = Instance.new("TextButton")
+local colorButton = Instance.new("TextButton")
+local rainbowSpeedFrame = Instance.new("Frame")
 local rainbowSliderFill = Instance.new("Frame")
 local rainbowKnob = Instance.new("Frame")
-local tabContainer = Instance.new("Frame")
+local draggingRainbow = false
+
+local tabBar = Instance.new("Frame")
 local homeTab = Instance.new("Frame")
 local flyTab = Instance.new("Frame")
 local espTab = Instance.new("Frame")
 local noclipTab = Instance.new("Frame")
 local movementTab = Instance.new("Frame")
-local currentTab = homeTab
-local draggingRainbow = false
+local activeTab = homeTab
 
--- Загрузочный экран
 local loadingFrame = Instance.new("Frame")
 local loadingLabel = Instance.new("TextLabel")
 local loadingAuthor = Instance.new("TextLabel")
 
-function createLoadingScreen()
+-- Функция загрузочного экрана
+local function showLoading()
     loadingFrame.Size = UDim2.new(0.5, 0, 0.15, 0)
     loadingFrame.Position = UDim2.new(0.25, 0, 0.425, 0)
     loadingFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
@@ -115,536 +129,26 @@ function createLoadingScreen()
     loadingAuthor.TextScaled = true
     loadingAuthor.Parent = loadingFrame
     
-    local appear = TweenService:Create(loadingFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2})
-    appear:Play()
+    local tweenIn = TweenService:Create(loadingFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2})
+    tweenIn:Play()
     wait(2)
-    local disappear = TweenService:Create(loadingFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
-    disappear:Play()
-    disappear.Completed:Wait()
+    local tweenOut = TweenService:Create(loadingFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+    tweenOut:Play()
+    tweenOut.Completed:Wait()
     loadingFrame:Destroy()
-    
-    local mainAppear = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {BackgroundTransparency = 0.05})
-    mainAppear:Play()
 end
 
-function updateRainbow()
-    if currentColor == "rainbow" then
-        rainbowHue = (rainbowHue + 0.0167 * rainbowSpeed) % 1
-        local color = Color3.fromHSV(rainbowHue, 1, 1)
-        mainFrame.BackgroundColor3 = color
-        topBar.BackgroundColor3 = color
-    end
+-- Обновление радужного цвета
+local function updateRainbow()
+    if not rainbowEnabled then return end
+    rainbowHue = (rainbowHue + 0.0167 * rainbowSpeed) % 1
+    local color = Color3.fromHSV(rainbowHue, 1, 1)
+    mainFrame.BackgroundColor3 = color
+    topBar.BackgroundColor3 = color
 end
 
-function createMainUI()
-    mainFrame.Size = UDim2.new(0, 350, 0, 500)
-    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    mainFrame.BackgroundTransparency = 0.05
-    mainFrame.BorderSizePixel = 0
-    mainFrame.ClipsDescendants = true
-    mainFrame.Parent = screenGui
-    
-    topBar.Size = UDim2.new(1, 0, 0, 50)
-    topBar.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    topBar.BorderSizePixel = 0
-    topBar.Parent = mainFrame
-    
-    titleLabel.Size = UDim2.new(0.5, 0, 1, 0)
-    titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "VANEZY UNIVERSAL"
-    titleLabel.TextColor3 = Color3.fromRGB(255,255,255)
-    titleLabel.TextSize = 20
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = topBar
-    
-    authorLabel.Size = UDim2.new(0.4, 0, 0.5, 0)
-    authorLabel.Position = UDim2.new(0.05, 0, 0.5, 0)
-    authorLabel.BackgroundTransparency = 1
-    authorLabel.Text = "Vanezy"
-    authorLabel.TextColor3 = Color3.fromRGB(180,180,180)
-    authorLabel.TextSize = 12
-    authorLabel.Font = Enum.Font.Gotham
-    authorLabel.TextXAlignment = Enum.TextXAlignment.Left
-    authorLabel.Parent = topBar
-    
-    iconLabel.Size = UDim2.new(0, 40, 1, 0)
-    iconLabel.Position = UDim2.new(1, -200, 0, 0)
-    iconLabel.BackgroundTransparency = 1
-    iconLabel.Text = "🌙"
-    iconLabel.TextColor3 = Color3.fromRGB(255,255,255)
-    iconLabel.TextSize = 30
-    iconLabel.Font = Enum.Font.GothamBold
-    iconLabel.Parent = topBar
-    
-    closeBtn.Size = UDim2.new(0, 40, 1, 0)
-    closeBtn.Position = UDim2.new(1, -40, 0, 0)
-    closeBtn.BackgroundTransparency = 1
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255,100,100)
-    closeBtn.TextSize = 20
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.Parent = topBar
-    
-    minimizeBtn.Size = UDim2.new(0, 40, 1, 0)
-    minimizeBtn.Position = UDim2.new(1, -80, 0, 0)
-    minimizeBtn.BackgroundTransparency = 1
-    minimizeBtn.Text = "−"
-    minimizeBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    minimizeBtn.TextSize = 20
-    minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.Parent = topBar
-    
-    colorBtn.Size = UDim2.new(0, 60, 0.6, 0)
-    colorBtn.Position = UDim2.new(0.6, 0, 0.2, 0)
-    colorBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    colorBtn.Text = "Цвет"
-    colorBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    colorBtn.TextSize = 14
-    colorBtn.Parent = topBar
-    
-    rainbowSpeedSlider.Size = UDim2.new(0.3, 0, 0.05, 0)
-    rainbowSpeedSlider.Position = UDim2.new(0.6, 0, 0.85, 0)
-    rainbowSpeedSlider.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    rainbowSpeedSlider.Visible = false
-    rainbowSpeedSlider.Parent = mainFrame
-    
-    rainbowSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-    rainbowSliderFill.BackgroundColor3 = Color3.fromRGB(0,255,0)
-    rainbowSliderFill.BorderSizePixel = 0
-    rainbowSliderFill.Parent = rainbowSpeedSlider
-    
-    rainbowKnob.Size = UDim2.new(0, 10, 0, 20)
-    rainbowKnob.Position = UDim2.new(0.5, -5, 0.5, -10)
-    rainbowKnob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    rainbowKnob.BorderSizePixel = 0
-    rainbowKnob.Parent = rainbowSpeedSlider
-    
-    tabContainer.Size = UDim2.new(1, 0, 0, 40)
-    tabContainer.Position = UDim2.new(0, 0, 0, 50)
-    tabContainer.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    tabContainer.BorderSizePixel = 0
-    tabContainer.Parent = mainFrame
-    
-    createTabButtons()
-    createHomeTab()
-    createFlyTab()
-    createEspTab()
-    createNoclipTab()
-    createMovementTab()
-    
-    homeTab.Visible = true
-    
-    local dragStart, dragStartPos
-    topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragStart = input.Position
-            dragStartPos = mainFrame.Position
-        end
-    end)
-    
-    topBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch and dragStart then
-            local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
-        end
-    end)
-    
-    topBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            dragStart = nil
-        end
-    end)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-        if flyEnabled then toggleFly() end
-        if noclipEnabled then toggleNoclip() end
-        if espEnabled then stopESP() end
-        if rainbowConnection then rainbowConnection:Disconnect() end
-    end)
-    
-    minimizeBtn.MouseButton1Click:Connect(function()
-        minimized = not minimized
-        if minimized then
-            mainFrame.Size = UDim2.new(0, 350, 0, 50)
-            tabContainer.Visible = false
-            minimizeBtn.Text = "□"
-        else
-            mainFrame.Size = UDim2.new(0, 350, 0, 500)
-            tabContainer.Visible = true
-            minimizeBtn.Text = "−"
-        end
-    end)
-    
-    colorBtn.MouseButton1Click:Connect(function()
-        local currentIndex = 1
-        for i, col in ipairs(colors) do
-            if col.Color == currentColor or (type(currentColor)=="string" and col.Name=="Радужный") then
-                currentIndex = i % #colors + 1
-                break
-            end
-        end
-        local newColor = colors[currentIndex]
-        if newColor.Color == "rainbow" then
-            currentColor = "rainbow"
-            rainbowSpeedSlider.Visible = true
-            if rainbowConnection then rainbowConnection:Disconnect() end
-            rainbowConnection = RunService.RenderStepped:Connect(updateRainbow)
-        else
-            currentColor = newColor.Color
-            rainbowSpeedSlider.Visible = false
-            if rainbowConnection then rainbowConnection:Disconnect() end
-            mainFrame.BackgroundColor3 = currentColor
-            topBar.BackgroundColor3 = currentColor
-        end
-    end)
-    
-    rainbowKnob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            draggingRainbow = true
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            draggingRainbow = false
-        end
-    end)
-    
-    RunService.RenderStepped:Connect(function()
-        if draggingRainbow and rainbowSpeedSlider.Visible then
-            local touchPos = UserInputService:GetTouchPositions()[1]
-            if touchPos then
-                local relX = math.clamp((touchPos.X - rainbowSpeedSlider.AbsolutePosition.X) / rainbowSpeedSlider.AbsoluteSize.X, 0, 1)
-                rainbowSpeed = 0.5 + relX * 4.5
-                rainbowSliderFill.Size = UDim2.new(relX, 0, 1, 0)
-                rainbowKnob.Position = UDim2.new(relX, -5, 0.5, -10)
-            end
-        end
-    end)
-end
-
-function createTabButtons()
-    local tabs = {"🏠 Home", "✈ Fly", "👁 ESP", "🧱 Noclip", "⚡ Movement"}
-    local tabFrames = {homeTab, flyTab, espTab, noclipTab, movementTab}
-    
-    for i, tabName in ipairs(tabs) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.2, 0, 1, 0)
-        btn.Position = UDim2.new((i-1)*0.2, 0, 0, 0)
-        btn.BackgroundTransparency = 1
-        btn.Text = tabName
-        btn.TextColor3 = Color3.fromRGB(200,200,200)
-        btn.TextSize = 14
-        btn.Font = Enum.Font.Gotham
-        btn.Parent = tabContainer
-        
-        btn.MouseButton1Click:Connect(function()
-            currentTab.Visible = false
-            currentTab = tabFrames[i]
-            currentTab.Visible = true
-            for _, other in ipairs(tabContainer:GetChildren()) do
-                if other:IsA("TextButton") then
-                    other.TextColor3 = Color3.fromRGB(200,200,200)
-                end
-            end
-            btn.TextColor3 = Color3.fromRGB(255,255,255)
-        end)
-    end
-end
-
-function createHomeTab()
-    homeTab.Size = UDim2.new(1, 0, 1, -40)
-    homeTab.Position = UDim2.new(0, 0, 0, 40)
-    homeTab.BackgroundTransparency = 1
-    homeTab.Parent = mainFrame
-    
-    local devLabel = Instance.new("TextLabel")
-    devLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
-    devLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
-    devLabel.BackgroundTransparency = 1
-    devLabel.Text = "Разработчик: Vanezy"
-    devLabel.TextColor3 = Color3.fromRGB(255,255,255)
-    devLabel.TextSize = 16
-    devLabel.Font = Enum.Font.GothamBold
-    devLabel.TextXAlignment = Enum.TextXAlignment.Left
-    devLabel.Parent = homeTab
-    
-    local socials = {"Discord: vanezy.gg", "Telegram: @vanezy", "GitHub: /vanezy", "YouTube: @VanezyScripts"}
-    for i, social in ipairs(socials) do
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(0.9, 0, 0.08, 0)
-        lbl.Position = UDim2.new(0.05, 0, 0.2 + (i-1)*0.1, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = social
-        lbl.TextColor3 = Color3.fromRGB(180,180,255)
-        lbl.TextSize = 14
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = homeTab
-    end
-    
-    local versionLabel = Instance.new("TextLabel")
-    versionLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-    versionLabel.Position = UDim2.new(0.05, 0, 0.85, 0)
-    versionLabel.BackgroundTransparency = 1
-    versionLabel.Text = "Версия: 1.0 FULL | Mobile Optimized"
-    versionLabel.TextColor3 = Color3.fromRGB(150,150,150)
-    versionLabel.TextSize = 12
-    versionLabel.Font = Enum.Font.Gotham
-    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    versionLabel.Parent = homeTab
-    
-    local thanksLabel = Instance.new("TextLabel")
-    thanksLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-    thanksLabel.Position = UDim2.new(0.05, 0, 0.75, 0)
-    thanksLabel.BackgroundTransparency = 1
-    thanksLabel.Text = "Спасибо за использование!"
-    thanksLabel.TextColor3 = Color3.fromRGB(100,255,100)
-    thanksLabel.TextSize = 12
-    thanksLabel.Font = Enum.Font.Gotham
-    thanksLabel.TextXAlignment = Enum.TextXAlignment.Left
-    thanksLabel.Parent = homeTab
-end
-
-function createFlyTab()
-    flyTab.Size = UDim2.new(1, 0, 1, -40)
-    flyTab.Position = UDim2.new(0, 0, 0, 40)
-    flyTab.BackgroundTransparency = 1
-    flyTab.Visible = false
-    flyTab.Parent = mainFrame
-    
-    local flyToggle = createToggle("Флай", false, flyTab, 0.05)
-    local speedSlider = createSlider("Скорость флая", 10, 200, flySpeed, flyTab, 0.2, function(v) flySpeed = v end)
-    
-    flyToggle.OnToggle:Connect(function(enabled)
-        if enabled then 
-            toggleFly() 
-        else 
-            toggleFly() 
-        end
-    end)
-    
-    local joyStickFrame = Instance.new("Frame")
-    joyStickFrame.Size = UDim2.new(0, 120, 0, 120)
-    joyStickFrame.Position = UDim2.new(0.65, 0, 0.45, 0)
-    joyStickFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    joyStickFrame.BackgroundTransparency = 0.5
-    joyStickFrame.BorderSizePixel = 0
-    joyStickFrame.Parent = flyTab
-    
-    local stick = Instance.new("Frame")
-    stick.Size = UDim2.new(0, 45, 0, 45)
-    stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
-    stick.BackgroundColor3 = Color3.fromRGB(100,100,100)
-    stick.BorderSizePixel = 0
-    stick.Parent = joyStickFrame
-    
-    local joyActive = false
-    local joyStart = nil
-    
-    joyStickFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            joyActive = true
-            joyStart = input.Position
-        end
-    end)
-    
-    RunService.RenderStepped:Connect(function()
-        if not flyEnabled then return end
-        if joyActive and UserInputService:GetTouchPositions()[1] then
-            local touchPos = UserInputService:GetTouchPositions()[1]
-            local delta = touchPos - joyStart
-            local angle = math.atan2(delta.Y, delta.X)
-            local magnitude = math.min(delta.Magnitude, 60)
-            stick.Position = UDim2.new(0.5, (math.cos(angle)*magnitude)-22.5, 0.5, (math.sin(angle)*magnitude)-22.5)
-            flyControl.Forward = -math.sin(angle) * (magnitude/60)
-            flyControl.Right = math.cos(angle) * (magnitude/60)
-        else
-            stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
-            flyControl.Forward = 0
-            flyControl.Right = 0
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            joyActive = false
-        end
-    end)
-    
-    local upBtn = Instance.new("TextButton")
-    upBtn.Size = UDim2.new(0, 60, 0, 60)
-    upBtn.Position = UDim2.new(0.05, 0, 0.6, 0)
-    upBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    upBtn.Text = "▲"
-    upBtn.TextSize = 30
-    upBtn.Font = Enum.Font.GothamBold
-    upBtn.Parent = flyTab
-    
-    local downBtn = Instance.new("TextButton")
-    downBtn.Size = UDim2.new(0, 60, 0, 60)
-    downBtn.Position = UDim2.new(0.05, 0, 0.8, 0)
-    downBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    downBtn.Text = "▼"
-    downBtn.TextSize = 30
-    downBtn.Font = Enum.Font.GothamBold
-    downBtn.Parent = flyTab
-    
-    upBtn.MouseButton1Down:Connect(function() flyControl.Up = 1 end)
-    upBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
-    downBtn.MouseButton1Down:Connect(function() flyControl.Up = -1 end)
-    downBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
-    
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(0.5, 0, 0.08, 0)
-    infoLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
-    infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "Джойстик - движение по X/Z"
-    infoLabel.TextColor3 = Color3.fromRGB(200,200,200)
-    infoLabel.TextSize = 12
-    infoLabel.Font = Enum.Font.Gotham
-    infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-    infoLabel.Parent = flyTab
-end
-
-function createEspTab()
-    espTab.Size = UDim2.new(1, 0, 1, -40)
-    espTab.Position = UDim2.new(0, 0, 0, 40)
-    espTab.BackgroundTransparency = 1
-    espTab.Visible = false
-    espTab.Parent = mainFrame
-    
-    local espToggle = createToggle("ESP Игроков", false, espTab, 0.05)
-    local chestToggle = createToggle("ESP Сундуков", false, espTab, 0.15)
-    local mobToggle = createToggle("ESP Мобов", false, espTab, 0.25)
-    local sizeSlider = createSlider("ESP Размер", 0.5, 3, espSize, espTab, 0.35, function(v) espSize = v end)
-    local hpToggle = createToggle("ESP ХП", false, espTab, 0.45)
-    local distToggle = createToggle("ESP Расстояние", false, espTab, 0.55)
-    
-    espToggle.OnToggle:Connect(function(v) 
-        espEnabled = v
-        if v then 
-            startESP() 
-        else 
-            stopESP() 
-        end
-    end)
-    chestToggle.OnToggle:Connect(function(v) espChestEnabled = v end)
-    mobToggle.OnToggle:Connect(function(v) espMobEnabled = v end)
-    hpToggle.OnToggle:Connect(function(v) espHP = v end)
-    distToggle.OnToggle:Connect(function(v) espDistance = v end)
-end
-
-function createNoclipTab()
-    noclipTab.Size = UDim2.new(1, 0, 1, -40)
-    noclipTab.Position = UDim2.new(0, 0, 0, 40)
-    noclipTab.BackgroundTransparency = 1
-    noclipTab.Visible = false
-    noclipTab.Parent = mainFrame
-    
-    local noclipToggle = createToggle("Сквозь стены", false, noclipTab, 0.05)
-    local floorToggle = createToggle("Сквозь пол", false, noclipTab, 0.15)
-    local ceilingToggle = createToggle("Сквозь потолок", false, noclipTab, 0.25)
-    
-    noclipToggle.OnToggle:Connect(function(v) 
-        noclipWalls = v
-        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
-        toggleNoclip()
-    end)
-    floorToggle.OnToggle:Connect(function(v) 
-        noclipFloor = v
-        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
-        toggleNoclip()
-    end)
-    ceilingToggle.OnToggle:Connect(function(v) 
-        noclipCeiling = v
-        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
-        toggleNoclip()
-    end)
-end
-
-function createMovementTab()
-    movementTab.Size = UDim2.new(1, 0, 1, -40)
-    movementTab.Position = UDim2.new(0, 0, 0, 40)
-    movementTab.BackgroundTransparency = 1
-    movementTab.Visible = false
-    movementTab.Parent = mainFrame
-    
-    local walkSlider = createSlider("Speed ходьбы", 16, 100, walkSpeedValue, movementTab, 0.05, function(v) 
-        walkSpeedValue = v
-        if not speedHack and not autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then 
-            player.Character.Humanoid.WalkSpeed = v 
-        end
-    end)
-    local jumpSlider = createSlider("Прыжок", 50, 200, jumpPower, movementTab, 0.18, function(v) 
-        jumpPower = v
-        if player.Character and player.Character:FindFirstChild("Humanoid") then 
-            player.Character.Humanoid.JumpPower = v 
-        end
-    end)
-    local speedToggle = createToggle("Спидхак", false, movementTab, 0.31)
-    local speedValueSlider = createSlider("Спидхак скорость", 16, 500, speedValue, movementTab, 0.41, function(v) 
-        speedValue = v
-        if speedHack and player.Character and player.Character:FindFirstChild("Humanoid") then 
-            player.Character.Humanoid.WalkSpeed = v 
-        end
-    end)
-    local infiniteToggle = createToggle("Бесконечные прыжки", false, movementTab, 0.54)
-    local fovSlider = createSlider("FOV", 70, 120, fovValue, movementTab, 0.64, function(v) 
-        fovValue = v
-        game.Workspace.CurrentCamera.FieldOfView = v 
-    end)
-    local autoRunSpeedSlider = createSlider("Автобег скорость", 16, 100, autoRunSpeed, movementTab, 0.74, function(v) 
-        autoRunSpeed = v
-        if autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then 
-            player.Character.Humanoid.WalkSpeed = v 
-        end
-    end)
-    local autoRunToggle = createToggle("Автобег", false, movementTab, 0.87)
-    
-    speedToggle.OnToggle:Connect(function(v) 
-        speedHack = v
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            if v then 
-                player.Character.Humanoid.WalkSpeed = speedValue 
-            else 
-                player.Character.Humanoid.WalkSpeed = walkSpeedValue 
-            end
-        end
-    end)
-    infiniteToggle.OnToggle:Connect(function(v) infiniteJump = v end)
-    autoRunToggle.OnToggle:Connect(function(v) 
-        autoRun = v
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            if v then 
-                player.Character.Humanoid.WalkSpeed = autoRunSpeed
-                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local bodyVel = Instance.new("BodyVelocity")
-                    bodyVel.MaxForce = Vector3.new(1e6, 0, 1e6)
-                    bodyVel.Velocity = hrp.CFrame.LookVector * autoRunSpeed
-                    bodyVel.Parent = hrp
-                    task.wait(0.1)
-                    bodyVel:Destroy()
-                end
-            else 
-                player.Character.Humanoid.WalkSpeed = walkSpeedValue 
-            end
-        end
-    end)
-    
-    UserInputService.JumpRequest:Connect(function()
-        if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end)
-end
-
-function createToggle(text, defaultValue, parent, yPos, callback)
+-- Создание переключателя (красный/зелёный)
+local function createToggle(text, defaultValue, parent, yPos, callback)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.9, 0, 0, 40)
     frame.Position = UDim2.new(0.05, 0, yPos, 0)
@@ -671,27 +175,22 @@ function createToggle(text, defaultValue, parent, yPos, callback)
     btn.Font = Enum.Font.GothamBold
     btn.Parent = frame
     
-    local toggled = defaultValue
+    local state = defaultValue
     local event = Instance.new("BindableEvent")
     
     btn.MouseButton1Click:Connect(function()
-        toggled = not toggled
-        btn.BackgroundColor3 = toggled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
-        btn.Text = toggled and "Вкл" or "Выкл"
-        event:Fire(toggled)
-        if callback then callback(toggled) end
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        btn.Text = state and "Вкл" or "Выкл"
+        event:Fire(state)
+        if callback then callback(state) end
     end)
     
-    return {OnToggle = event.Event, SetValue = function(v) 
-        toggled = v
-        btn.BackgroundColor3 = v and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
-        btn.Text = v and "Вкл" or "Выкл"
-        event:Fire(v)
-        if callback then callback(v) end
-    end}
+    return {OnToggle = event.Event, Set = function(v) state = v; btn.BackgroundColor3 = v and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0); btn.Text = v and "Вкл" or "Выкл"; event:Fire(v); if callback then callback(v) end end}
 end
 
-function createSlider(text, minVal, maxVal, defaultValue, parent, yPos, callback)
+-- Создание слайдера (ползунок)
+local function createSlider(text, minVal, maxVal, defaultVal, parent, yPos, callback)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.9, 0, 0, 50)
     frame.Position = UDim2.new(0.05, 0, yPos, 0)
@@ -701,32 +200,32 @@ function createSlider(text, minVal, maxVal, defaultValue, parent, yPos, callback
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.6, 0, 0.4, 0)
     label.BackgroundTransparency = 1
-    label.Text = text .. ": " .. tostring(defaultValue)
+    label.Text = text .. ": " .. tostring(defaultVal)
     label.TextColor3 = Color3.fromRGB(255,255,255)
     label.TextSize = 14
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
     
-    local slider = Instance.new("Frame")
-    slider.Size = UDim2.new(0.8, 0, 0, 4)
-    slider.Position = UDim2.new(0, 0, 0.7, 0)
-    slider.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    slider.BorderSizePixel = 0
-    slider.Parent = frame
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(0.8, 0, 0, 4)
+    sliderBg.Position = UDim2.new(0, 0, 0.7, 0)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = frame
     
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((defaultValue-minVal)/(maxVal-minVal), 0, 1, 0)
+    fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
     fill.BackgroundColor3 = Color3.fromRGB(0,255,0)
     fill.BorderSizePixel = 0
-    fill.Parent = slider
+    fill.Parent = sliderBg
     
     local knob = Instance.new("Frame")
     knob.Size = UDim2.new(0, 12, 0, 12)
-    knob.Position = UDim2.new((defaultValue-minVal)/(maxVal-minVal), -6, 0.5, -6)
+    knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -6, 0.5, -6)
     knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
     knob.BorderSizePixel = 0
-    knob.Parent = slider
+    knob.Parent = sliderBg
     
     local dragging = false
     
@@ -742,8 +241,8 @@ function createSlider(text, minVal, maxVal, defaultValue, parent, yPos, callback
         end
     end)
     
-    local function update(pos)
-        local relX = math.clamp((pos.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+    local function updateFromPosition(touchPos)
+        local relX = math.clamp((touchPos.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
         local val = minVal + relX * (maxVal - minVal)
         val = math.floor(val * 10) / 10
         label.Text = text .. ": " .. tostring(val)
@@ -754,94 +253,56 @@ function createSlider(text, minVal, maxVal, defaultValue, parent, yPos, callback
     
     RunService.RenderStepped:Connect(function()
         if dragging then
-            local touchPos = UserInputService:GetTouchPositions()[1]
-            if touchPos then update(touchPos) end
+            local touches = UserInputService:GetTouchPositions()
+            if #touches > 0 then
+                updateFromPosition(touches[1])
+            end
         end
     end)
 end
 
-function toggleFly()
+-- Функция полёта
+local function toggleFly()
     flyEnabled = not flyEnabled
     local char = player.Character
     if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
-    if not humanoid then return end
+    if not hrp or not humanoid then return end
     
     if flyEnabled then
         humanoid.PlatformStand = true
-        bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        bodyVelocity.Parent = char:FindFirstChild("HumanoidRootPart")
+        flyBodyVel = Instance.new("BodyVelocity")
+        flyBodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        flyBodyVel.Parent = hrp
         
-        bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-        bodyGyro.CFrame = char:FindFirstChild("HumanoidRootPart").CFrame
-        bodyGyro.Parent = char:FindFirstChild("HumanoidRootPart")
+        flyBodyGyro = Instance.new("BodyGyro")
+        flyBodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        flyBodyGyro.CFrame = hrp.CFrame
+        flyBodyGyro.Parent = hrp
         
         if flyConnection then flyConnection:Disconnect() end
         flyConnection = RunService.RenderStepped:Connect(function()
-            if not flyEnabled or not bodyVelocity or not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            if not flyEnabled or not flyBodyVel or not char or not hrp then return end
             local cam = workspace.CurrentCamera
-            local cf = cam.CFrame
-            local moveDir = (cf.LookVector * flyControl.Forward) + (cf.RightVector * flyControl.Right) + (Vector3.new(0, flyControl.Up, 0))
+            local moveDir = (cam.CFrame.LookVector * flyControl.Forward) + (cam.CFrame.RightVector * flyControl.Right) + (Vector3.new(0, flyControl.Up, 0))
             if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
-            bodyVelocity.Velocity = moveDir * flySpeed
-            if bodyGyro then
-                bodyGyro.CFrame = cam.CFrame
-            end
+            flyBodyVel.Velocity = moveDir * flySpeed
+            if flyBodyGyro then flyBodyGyro.CFrame = cam.CFrame end
         end)
     else
         humanoid.PlatformStand = false
-        if bodyVelocity then bodyVelocity:Destroy() end
-        if bodyGyro then bodyGyro:Destroy() end
-        bodyVelocity = nil
-        bodyGyro = nil
+        if flyBodyVel then flyBodyVel:Destroy() end
+        if flyBodyGyro then flyBodyGyro:Destroy() end
         if flyConnection then flyConnection:Disconnect() end
+        flyBodyVel = nil
+        flyBodyGyro = nil
     end
 end
 
-function toggleNoclip()
-    if noclipEnabled then
-        if noclipConnection then noclipConnection:Disconnect() end
-        noclipConnection = RunService.RenderStepped:Connect(function()
-            local char = player.Character
-            if not char then return end
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
-            
-            if noclipWalls then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-            
-            if noclipFloor then
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {char}
-                params.FilterType = Enum.RaycastFilterType.Blacklist
-                local floorCheck = workspace:Raycast(hrp.Position, Vector3.new(0, -3, 0), params)
-                if floorCheck and floorCheck.Instance then
-                    floorCheck.Instance.CanCollide = false
-                    task.wait(0.1)
-                    floorCheck.Instance.CanCollide = true
-                end
-            end
-            
-            if noclipCeiling then
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {char}
-                params.FilterType = Enum.RaycastFilterType.Blacklist
-                local ceilCheck = workspace:Raycast(hrp.Position, Vector3.new(0, 3, 0), params)
-                if ceilCheck and ceilCheck.Instance then
-                    ceilCheck.Instance.CanCollide = false
-                    task.wait(0.1)
-                    ceilCheck.Instance.CanCollide = true
-                end
-            end
-        end)
-    else
+-- Функция Noclip
+local function updateNoclip()
+    if not noclipEnabled then
         if noclipConnection then noclipConnection:Disconnect() end
         local char = player.Character
         if char then
@@ -851,20 +312,61 @@ function toggleNoclip()
                 end
             end
         end
-    end
-end
-
-function createESP(instance, color, text)
-    if espObjects[instance] then 
-        if espObjects[instance].bill then espObjects[instance].bill:Destroy() end
-        espObjects[instance] = nil
+        return
     end
     
+    if noclipConnection then noclipConnection:Disconnect() end
+    noclipConnection = RunService.RenderStepped:Connect(function()
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        if noclipWalls then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+        
+        if noclipFloor then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local hit = workspace:Raycast(hrp.Position, Vector3.new(0, -3, 0), params)
+            if hit and hit.Instance then
+                hit.Instance.CanCollide = false
+                task.wait(0.05)
+                hit.Instance.CanCollide = true
+            end
+        end
+        
+        if noclipCeiling then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local hit = workspace:Raycast(hrp.Position, Vector3.new(0, 3, 0), params)
+            if hit and hit.Instance then
+                hit.Instance.CanCollide = false
+                task.wait(0.05)
+                hit.Instance.CanCollide = true
+            end
+        end
+    end)
+end
+
+-- ESP функции
+local function createESPForObject(obj, color, text)
+    if espObjects[obj] then
+        if espObjects[obj].bill then espObjects[obj].bill:Destroy() end
+        espObjects[obj] = nil
+    end
     local bill = Instance.new("BillboardGui")
     bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
     bill.StudsOffset = Vector3.new(0, 2.5, 0)
     bill.AlwaysOnTop = true
-    bill.Parent = instance
+    bill.Parent = obj
     
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1,0,1,0)
@@ -873,18 +375,17 @@ function createESP(instance, color, text)
     frame.BorderSizePixel = 0
     frame.Parent = bill
     
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1,0,0.5,0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = text
-    nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
-    nameLabel.TextScaled = true
-    nameLabel.Parent = frame
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size = UDim2.new(1,0,0.5,0)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text = text
+    nameLbl.TextColor3 = Color3.fromRGB(255,255,255)
+    nameLbl.TextScaled = true
+    nameLbl.Parent = frame
     
     local hpBar = nil
-    local distLabel = nil
-    
-    if espHP then
+    local distLbl = nil
+    if espShowHP then
         hpBar = Instance.new("Frame")
         hpBar.Size = UDim2.new(1,0,0.2,0)
         hpBar.Position = UDim2.new(0,0,0.8,0)
@@ -893,11 +394,11 @@ function createESP(instance, color, text)
         hpBar.Parent = frame
     end
     
-    espObjects[instance] = {bill = bill, hpBar = hpBar, distLabel = distLabel, frame = frame, nameLabel = nameLabel}
+    espObjects[obj] = {bill = bill, frame = frame, nameLbl = nameLbl, hpBar = hpBar, distLbl = distLbl}
     return bill
 end
 
-function updateESP()
+local function updateESP()
     if not espEnabled then return end
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -906,43 +407,41 @@ function updateESP()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local dist = (plr.Character.HumanoidRootPart.Position - rootPos).Magnitude
-            local humanoid = plr.Character:FindFirstChild("Humanoid")
-            local hpPercent = humanoid and (humanoid.Health / humanoid.MaxHealth) or 1
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            local hpPercent = hum and (hum.Health / hum.MaxHealth) or 1
             
             if not espObjects[plr.Character] then
-                createESP(plr.Character, Color3.fromRGB(255,0,0), plr.Name)
-            else
-                local data = espObjects[plr.Character]
-                if data.bill then
-                    data.bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
-                end
-                if espDistance and data.distLabel then
-                    data.distLabel.Text = math.floor(dist) .. "m"
-                elseif espDistance and not data.distLabel then
-                    data.distLabel = Instance.new("TextLabel")
-                    data.distLabel.Size = UDim2.new(1,0,0.3,0)
-                    data.distLabel.Position = UDim2.new(0,0,0,0)
-                    data.distLabel.BackgroundTransparency = 1
-                    data.distLabel.Text = math.floor(dist) .. "m"
-                    data.distLabel.TextColor3 = Color3.fromRGB(255,255,0)
-                    data.distLabel.TextScaled = true
-                    data.distLabel.Parent = data.frame
-                elseif not espDistance and data.distLabel then
-                    data.distLabel:Destroy()
-                    data.distLabel = nil
+                createESPForObject(plr.Character, Color3.fromRGB(255,0,0), plr.Name)
+            end
+            local data = espObjects[plr.Character]
+            if data and data.bill then
+                data.bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
+                if espShowDist then
+                    if not data.distLbl then
+                        data.distLbl = Instance.new("TextLabel")
+                        data.distLbl.Size = UDim2.new(1,0,0.3,0)
+                        data.distLbl.Position = UDim2.new(0,0,0,0)
+                        data.distLbl.BackgroundTransparency = 1
+                        data.distLbl.TextColor3 = Color3.fromRGB(255,255,0)
+                        data.distLbl.TextScaled = true
+                        data.distLbl.Parent = data.frame
+                    end
+                    data.distLbl.Text = math.floor(dist) .. "m"
+                elseif data.distLbl then
+                    data.distLbl:Destroy()
+                    data.distLbl = nil
                 end
                 
-                if espHP and data.hpBar then
+                if espShowHP then
+                    if not data.hpBar then
+                        data.hpBar = Instance.new("Frame")
+                        data.hpBar.Position = UDim2.new(0,0,0.8,0)
+                        data.hpBar.BorderSizePixel = 0
+                        data.hpBar.Parent = data.frame
+                    end
                     data.hpBar.Size = UDim2.new(hpPercent, 0, 0.2, 0)
                     data.hpBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 0)
-                elseif espHP and not data.hpBar then
-                    data.hpBar = Instance.new("Frame")
-                    data.hpBar.Size = UDim2.new(hpPercent, 0, 0.2, 0)
-                    data.hpBar.Position = UDim2.new(0,0,0.8,0)
-                    data.hpBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 0)
-                    data.hpBar.BorderSizePixel = 0
-                    data.hpBar.Parent = data.frame
-                elseif not espHP and data.hpBar then
+                elseif data.hpBar then
                     data.hpBar:Destroy()
                     data.hpBar = nil
                 end
@@ -953,11 +452,11 @@ function updateESP()
         end
     end
     
-    if espChestEnabled then
+    if espChest then
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("treasure") or obj.Name:lower():find("crate") or obj.Name:lower():find("suitcase")) then
+            if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("treasure") or obj.Name:lower():find("crate")) then
                 if not espObjects[obj] then
-                    createESP(obj, Color3.fromRGB(255,165,0), obj.Name)
+                    createESPForObject(obj, Color3.fromRGB(255,165,0), obj.Name)
                 elseif espObjects[obj].bill then
                     espObjects[obj].bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
                 end
@@ -965,11 +464,11 @@ function updateESP()
         end
     end
     
-    if espMobEnabled then
+    if espMobs then
         for _, obj in pairs(workspace:GetDescendants()) do
             if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(obj) then
                 if not espObjects[obj] then
-                    createESP(obj, Color3.fromRGB(0,255,0), obj.Name)
+                    createESPForObject(obj, Color3.fromRGB(0,255,0), obj.Name)
                 elseif espObjects[obj].bill then
                     espObjects[obj].bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
                 end
@@ -978,12 +477,12 @@ function updateESP()
     end
 end
 
-function startESP()
+local function startESP()
     if espConnection then espConnection:Disconnect() end
     espConnection = RunService.RenderStepped:Connect(updateESP)
 end
 
-function stopESP()
+local function stopESP()
     if espConnection then espConnection:Disconnect() end
     for obj, data in pairs(espObjects) do
         if data.bill then data.bill:Destroy() end
@@ -991,19 +490,421 @@ function stopESP()
     espObjects = {}
 end
 
+-- Создание вкладок
+local function createTabs()
+    local tabs = {"🏠 HOME", "✈ FLY", "👁 ESP", "🧱 NOCLIP", "⚡ MOVEMENT"}
+    local frames = {homeTab, flyTab, espTab, noclipTab, movementTab}
+    for i, name in ipairs(tabs) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.2, 0, 1, 0)
+        btn.Position = UDim2.new((i-1)*0.2, 0, 0, 0)
+        btn.BackgroundTransparency = 1
+        btn.Text = name
+        btn.TextColor3 = Color3.fromRGB(200,200,200)
+        btn.TextSize = 14
+        btn.Font = Enum.Font.Gotham
+        btn.Parent = tabBar
+        btn.MouseButton1Click:Connect(function()
+            activeTab.Visible = false
+            activeTab = frames[i]
+            activeTab.Visible = true
+            for _, other in pairs(tabBar:GetChildren()) do
+                if other:IsA("TextButton") then
+                    other.TextColor3 = Color3.fromRGB(200,200,200)
+                end
+            end
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+        end)
+    end
+end
+
+-- HOME вкладка
+local function buildHomeTab()
+    homeTab.Size = UDim2.new(1, 0, 1, -40)
+    homeTab.Position = UDim2.new(0, 0, 0, 40)
+    homeTab.BackgroundTransparency = 1
+    homeTab.Parent = mainFrame
+    
+    local dev = Instance.new("TextLabel")
+    dev.Size = UDim2.new(0.9, 0, 0.1, 0)
+    dev.Position = UDim2.new(0.05, 0, 0.05, 0)
+    dev.BackgroundTransparency = 1
+    dev.Text = "Разработчик: Vanezy"
+    dev.TextColor3 = Color3.fromRGB(255,255,255)
+    dev.TextSize = 16
+    dev.Font = Enum.Font.GothamBold
+    dev.TextXAlignment = Enum.TextXAlignment.Left
+    dev.Parent = homeTab
+    
+    local socials = {"Discord: vanezy.gg", "Telegram: @vanezy", "GitHub: /vanezy", "YouTube: @VanezyScripts"}
+    for i, soc in ipairs(socials) do
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.9, 0, 0.08, 0)
+        lbl.Position = UDim2.new(0.05, 0, 0.2 + (i-1)*0.1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = soc
+        lbl.TextColor3 = Color3.fromRGB(180,180,255)
+        lbl.TextSize = 14
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = homeTab
+    end
+    
+    local ver = Instance.new("TextLabel")
+    ver.Size = UDim2.new(0.9, 0, 0.08, 0)
+    ver.Position = UDim2.new(0.05, 0, 0.85, 0)
+    ver.BackgroundTransparency = 1
+    ver.Text = "Версия: 2.0 COMPLETE | Mobile"
+    ver.TextColor3 = Color3.fromRGB(150,150,150)
+    ver.TextSize = 12
+    ver.Font = Enum.Font.Gotham
+    ver.TextXAlignment = Enum.TextXAlignment.Left
+    ver.Parent = homeTab
+end
+
+-- FLY вкладка
+local function buildFlyTab()
+    flyTab.Size = UDim2.new(1, 0, 1, -40)
+    flyTab.Position = UDim2.new(0, 0, 0, 40)
+    flyTab.BackgroundTransparency = 1
+    flyTab.Visible = false
+    flyTab.Parent = mainFrame
+    
+    local flyToggle = createToggle("Флай", false, flyTab, 0.05)
+    local speedSld = createSlider("Скорость флая", 10, 200, flySpeed, flyTab, 0.2, function(v) flySpeed = v end)
+    flyToggle.OnToggle:Connect(function(v) if v then toggleFly() else toggleFly() end end)
+    
+    -- Джойстик
+    local joyBg = Instance.new("Frame")
+    joyBg.Size = UDim2.new(0, 120, 0, 120)
+    joyBg.Position = UDim2.new(0.65, 0, 0.45, 0)
+    joyBg.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    joyBg.BackgroundTransparency = 0.5
+    joyBg.BorderSizePixel = 0
+    joyBg.Parent = flyTab
+    
+    local stick = Instance.new("Frame")
+    stick.Size = UDim2.new(0, 45, 0, 45)
+    stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+    stick.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    stick.BorderSizePixel = 0
+    stick.Parent = joyBg
+    
+    local joyActive = false
+    local joyStartPos = nil
+    joyBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            joyActive = true
+            joyStartPos = input.Position
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            joyActive = false
+            stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+            flyControl.Forward = 0
+            flyControl.Right = 0
+        end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if not flyEnabled then return end
+        if joyActive then
+            local touches = UserInputService:GetTouchPositions()
+            if #touches > 0 then
+                local delta = touches[1] - joyStartPos
+                local ang = math.atan2(delta.Y, delta.X)
+                local mag = math.min(delta.Magnitude, 60)
+                stick.Position = UDim2.new(0.5, math.cos(ang)*mag - 22.5, 0.5, math.sin(ang)*mag - 22.5)
+                flyControl.Forward = -math.sin(ang) * (mag/60)
+                flyControl.Right = math.cos(ang) * (mag/60)
+            end
+        else
+            stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+            flyControl.Forward = 0
+            flyControl.Right = 0
+        end
+    end)
+    
+    local upBtn = Instance.new("TextButton")
+    upBtn.Size = UDim2.new(0, 60, 0, 60)
+    upBtn.Position = UDim2.new(0.05, 0, 0.6, 0)
+    upBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    upBtn.Text = "▲"
+    upBtn.TextSize = 30
+    upBtn.Font = Enum.Font.GothamBold
+    upBtn.Parent = flyTab
+    local downBtn = Instance.new("TextButton")
+    downBtn.Size = UDim2.new(0, 60, 0, 60)
+    downBtn.Position = UDim2.new(0.05, 0, 0.8, 0)
+    downBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    downBtn.Text = "▼"
+    downBtn.TextSize = 30
+    downBtn.Font = Enum.Font.GothamBold
+    downBtn.Parent = flyTab
+    upBtn.MouseButton1Down:Connect(function() flyControl.Up = 1 end)
+    upBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
+    downBtn.MouseButton1Down:Connect(function() flyControl.Up = -1 end)
+    downBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
+end
+
+-- ESP вкладка
+local function buildEspTab()
+    espTab.Size = UDim2.new(1, 0, 1, -40)
+    espTab.Position = UDim2.new(0, 0, 0, 40)
+    espTab.BackgroundTransparency = 1
+    espTab.Visible = false
+    espTab.Parent = mainFrame
+    
+    local togEsp = createToggle("ESP Игроков", false, espTab, 0.05)
+    local togChest = createToggle("ESP Сундуков", false, espTab, 0.15)
+    local togMobs = createToggle("ESP Мобов", false, espTab, 0.25)
+    local sldSize = createSlider("ESP Размер", 0.5, 3, espSize, espTab, 0.35, function(v) espSize = v end)
+    local togHp = createToggle("ESP ХП", false, espTab, 0.45)
+    local togDist = createToggle("ESP Расстояние", false, espTab, 0.55)
+    
+    togEsp.OnToggle:Connect(function(v) espEnabled = v; if v then startESP() else stopESP() end end)
+    togChest.OnToggle:Connect(function(v) espChest = v end)
+    togMobs.OnToggle:Connect(function(v) espMobs = v end)
+    togHp.OnToggle:Connect(function(v) espShowHP = v end)
+    togDist.OnToggle:Connect(function(v) espShowDist = v end)
+end
+
+-- NOCLIP вкладка
+local function buildNoclipTab()
+    noclipTab.Size = UDim2.new(1, 0, 1, -40)
+    noclipTab.Position = UDim2.new(0, 0, 0, 40)
+    noclipTab.BackgroundTransparency = 1
+    noclipTab.Visible = false
+    noclipTab.Parent = mainFrame
+    
+    local togWalls = createToggle("Сквозь стены", false, noclipTab, 0.05)
+    local togFloor = createToggle("Сквозь пол", false, noclipTab, 0.15)
+    local togCeil = createToggle("Сквозь потолок", false, noclipTab, 0.25)
+    
+    togWalls.OnToggle:Connect(function(v) noclipWalls = v; noclipEnabled = noclipWalls or noclipFloor or noclipCeiling; updateNoclip() end)
+    togFloor.OnToggle:Connect(function(v) noclipFloor = v; noclipEnabled = noclipWalls or noclipFloor or noclipCeiling; updateNoclip() end)
+    togCeil.OnToggle:Connect(function(v) noclipCeiling = v; noclipEnabled = noclipWalls or noclipFloor or noclipCeiling; updateNoclip() end)
+end
+
+-- MOVEMENT вкладка
+local function buildMovementTab()
+    movementTab.Size = UDim2.new(1, 0, 1, -40)
+    movementTab.Position = UDim2.new(0, 0, 0, 40)
+    movementTab.BackgroundTransparency = 1
+    movementTab.Visible = false
+    movementTab.Parent = mainFrame
+    
+    local sldWalk = createSlider("Speed ходьбы", 16, 100, walkSpeedValue, movementTab, 0.05, function(v) walkSpeedValue = v; if not speedHack and not autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v end end)
+    local sldJump = createSlider("Прыжок", 50, 200, jumpPowerValue, movementTab, 0.18, function(v) jumpPowerValue = v; if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.JumpPower = v end end)
+    local togSpeedHack = createToggle("Спидхак", false, movementTab, 0.31)
+    local sldSpeedVal = createSlider("Спидхак скорость", 16, 500, speedHackValue, movementTab, 0.41, function(v) speedHackValue = v; if speedHack and player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v end end)
+    local togInfJump = createToggle("Бесконечные прыжки", false, movementTab, 0.54)
+    local sldFov = createSlider("FOV", 70, 120, fovValue, movementTab, 0.64, function(v) fovValue = v; workspace.CurrentCamera.FieldOfView = v end)
+    local sldAutoSpeed = createSlider("Автобег скорость", 16, 100, autoRunSpeed, movementTab, 0.74, function(v) autoRunSpeed = v; if autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v end end)
+    local togAuto = createToggle("Автобег", false, movementTab, 0.87)
+    
+    togSpeedHack.OnToggle:Connect(function(v) speedHack = v; if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v and speedHackValue or walkSpeedValue end end)
+    togInfJump.OnToggle:Connect(function(v) infiniteJump = v end)
+    togAuto.OnToggle:Connect(function(v) autoRun = v; if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.WalkSpeed = v and autoRunSpeed or walkSpeedValue end end)
+    
+    UserInputService.JumpRequest:Connect(function()
+        if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+end
+
+-- Основное меню
+local function buildMainUI()
+    mainFrame.Size = UDim2.new(0, 350, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    mainFrame.BackgroundTransparency = 0.05
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+    
+    topBar.Size = UDim2.new(1, 0, 0, 50)
+    topBar.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    topBar.BorderSizePixel = 0
+    topBar.Parent = mainFrame
+    
+    titleText.Size = UDim2.new(0.5, 0, 1, 0)
+    titleText.Position = UDim2.new(0.05, 0, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "VANEZY UNIVERSAL"
+    titleText.TextColor3 = Color3.fromRGB(255,255,255)
+    titleText.TextSize = 20
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.Parent = topBar
+    
+    authorText.Size = UDim2.new(0.4, 0, 0.5, 0)
+    authorText.Position = UDim2.new(0.05, 0, 0.5, 0)
+    authorText.BackgroundTransparency = 1
+    authorText.Text = "Vanezy"
+    authorText.TextColor3 = Color3.fromRGB(180,180,180)
+    authorText.TextSize = 12
+    authorText.Font = Enum.Font.Gotham
+    authorText.TextXAlignment = Enum.TextXAlignment.Left
+    authorText.Parent = topBar
+    
+    iconStar.Size = UDim2.new(0, 40, 1, 0)
+    iconStar.Position = UDim2.new(1, -200, 0, 0)
+    iconStar.BackgroundTransparency = 1
+    iconStar.Text = "🌙"
+    iconStar.TextColor3 = Color3.fromRGB(255,255,255)
+    iconStar.TextSize = 30
+    iconStar.Font = Enum.Font.GothamBold
+    iconStar.Parent = topBar
+    
+    closeButton.Size = UDim2.new(0, 40, 1, 0)
+    closeButton.Position = UDim2.new(1, -40, 0, 0)
+    closeButton.BackgroundTransparency = 1
+    closeButton.Text = "✕"
+    closeButton.TextColor3 = Color3.fromRGB(255,100,100)
+    closeButton.TextSize = 20
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = topBar
+    
+    minimizeButton.Size = UDim2.new(0, 40, 1, 0)
+    minimizeButton.Position = UDim2.new(1, -80, 0, 0)
+    minimizeButton.BackgroundTransparency = 1
+    minimizeButton.Text = "−"
+    minimizeButton.TextColor3 = Color3.fromRGB(255,255,255)
+    minimizeButton.TextSize = 20
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.Parent = topBar
+    
+    colorButton.Size = UDim2.new(0, 60, 0.6, 0)
+    colorButton.Position = UDim2.new(0.6, 0, 0.2, 0)
+    colorButton.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    colorButton.Text = "Цвет"
+    colorButton.TextColor3 = Color3.fromRGB(255,255,255)
+    colorButton.TextSize = 14
+    colorButton.Parent = topBar
+    
+    rainbowSpeedFrame.Size = UDim2.new(0.3, 0, 0.05, 0)
+    rainbowSpeedFrame.Position = UDim2.new(0.6, 0, 0.85, 0)
+    rainbowSpeedFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    rainbowSpeedFrame.Visible = false
+    rainbowSpeedFrame.Parent = mainFrame
+    rainbowSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+    rainbowSliderFill.BackgroundColor3 = Color3.fromRGB(0,255,0)
+    rainbowSliderFill.BorderSizePixel = 0
+    rainbowSliderFill.Parent = rainbowSpeedFrame
+    rainbowKnob.Size = UDim2.new(0, 10, 0, 20)
+    rainbowKnob.Position = UDim2.new(0.5, -5, 0.5, -10)
+    rainbowKnob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    rainbowKnob.BorderSizePixel = 0
+    rainbowKnob.Parent = rainbowSpeedFrame
+    
+    tabBar.Size = UDim2.new(1, 0, 0, 40)
+    tabBar.Position = UDim2.new(0, 0, 0, 50)
+    tabBar.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    tabBar.BorderSizePixel = 0
+    tabBar.Parent = mainFrame
+    
+    buildHomeTab()
+    buildFlyTab()
+    buildEspTab()
+    buildNoclipTab()
+    buildMovementTab()
+    createTabs()
+    activeTab.Visible = true
+    
+    -- Перетаскивание
+    local dragStart, dragPos
+    topBar.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch then
+            dragStart = inp.Position
+            dragPos = mainFrame.Position
+        end
+    end)
+    topBar.InputChanged:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch and dragStart then
+            local delta = inp.Position - dragStart
+            mainFrame.Position = UDim2.new(dragPos.X.Scale, dragPos.X.Offset + delta.X, dragPos.Y.Scale, dragPos.Y.Offset + delta.Y)
+        end
+    end)
+    topBar.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch then dragStart = nil end
+    end)
+    
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        if flyEnabled then toggleFly() end
+        if noclipEnabled then noclipEnabled = false; updateNoclip() end
+        if espEnabled then stopESP() end
+    end)
+    
+    minimizeButton.MouseButton1Click:Connect(function()
+        guiMinimized = not guiMinimized
+        if guiMinimized then
+            mainFrame.Size = UDim2.new(0, 350, 0, 50)
+            tabBar.Visible = false
+            minimizeButton.Text = "□"
+        else
+            mainFrame.Size = UDim2.new(0, 350, 0, 500)
+            tabBar.Visible = true
+            minimizeButton.Text = "−"
+        end
+    end)
+    
+    colorButton.MouseButton1Click:Connect(function()
+        currentColorIndex = currentColorIndex % #colorOptions + 1
+        local opt = colorOptions[currentColorIndex]
+        if opt.color == "rainbow" then
+            rainbowEnabled = true
+            rainbowSpeedFrame.Visible = true
+            if not rainbowConnection then
+                rainbowConnection = RunService.RenderStepped:Connect(updateRainbow)
+            end
+        else
+            rainbowEnabled = false
+            rainbowSpeedFrame.Visible = false
+            if rainbowConnection then rainbowConnection:Disconnect() end
+            mainFrame.BackgroundColor3 = opt.color
+            topBar.BackgroundColor3 = opt.color
+            currentSolidColor = opt.color
+        end
+    end)
+    
+    rainbowKnob.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch then draggingRainbow = true end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.Touch then draggingRainbow = false end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if draggingRainbow and rainbowSpeedFrame.Visible then
+            local touches = UserInputService:GetTouchPositions()
+            if #touches > 0 then
+                local relX = math.clamp((touches[1].X - rainbowSpeedFrame.AbsolutePosition.X) / rainbowSpeedFrame.AbsoluteSize.X, 0, 1)
+                rainbowSpeed = 0.5 + relX * 4.5
+                rainbowSliderFill.Size = UDim2.new(relX, 0, 1, 0)
+                rainbowKnob.Position = UDim2.new(relX, -5, 0.5, -10)
+            end
+        end
+    end)
+end
+
+-- Запуск
 screenGui.Parent = CoreGui
-screenGui.Name = "VanezyScriptGUI"
-createMainUI()
-createLoadingScreen()
+screenGui.Name = "VanezyUniversal"
+buildMainUI()
+showLoading()
 
 player.CharacterAdded:Connect(function()
     task.wait(0.5)
     if flyEnabled then toggleFly() end
-    if noclipEnabled then toggleNoclip() end
+    if noclipEnabled then updateNoclip() end
     if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = autoRun and autoRunSpeed or (speedHack and speedValue or walkSpeedValue)
-        player.Character.Humanoid.JumpPower = jumpPower
+        local hum = player.Character.Humanoid
+        hum.WalkSpeed = autoRun and autoRunSpeed or (speedHack and speedHackValue or walkSpeedValue)
+        hum.JumpPower = jumpPowerValue
+        workspace.CurrentCamera.FieldOfView = fovValue
     end
 end)
 
-print("Vanezy Universal Script v1.0 FULL загружен")
+print("VANEZY UNIVERSAL v2.0 COMPLETE - 100% функций загружено")
