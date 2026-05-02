@@ -77,7 +77,7 @@ local espPlayersList = {}
 local espChestsList = {}
 local espMobsList = {}
 
-local isMinimized = true
+local isMinimized = false
 local floatingButton = nil
 
 -- =========== СОЗДАНИЕ GUI ===========
@@ -1520,14 +1520,19 @@ end
 -- =========== ЗАПУСК ===========
 task.wait(5.5)
 
--- Создаём плавающую иконку и показываем её (скрипт стартует в свёрнутом виде)
+-- Создаём плавающую иконку (всегда видна)
 createFloatingButton()
 floatingButton.Visible = true
 floatingButton.Position = UDim2.new(0, 10, 0.5, -27)
 settings.floatingX = 10
 settings.floatingY = math.floor(floatingButton.Position.Y.Offset)
 
-createNotification("✨ Script Loaded! Click ✨ to open", 3)
+-- Показываем главное меню (открыто при старте)
+isMinimized = false
+MainFrame.Visible = true
+MainFrame.Size = UDim2.new(0, settings.windowWidth, 0, settings.windowHeight)
+MainFrame.BackgroundTransparency = 0.05
+local menuAppear = TweenService:Create(MainFrame, TweenInfo.new(0.4), {BackgroundTransparency = 0.05})
+menuAppear:Play()
 
-print("✅ Synapse Hub v16 loaded!")
-print("📢 Telegram: @VanezyScripts")
+createNotification("✨ Script Loaded! Click the icon to minimize/open", 3)
