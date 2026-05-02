@@ -1,9 +1,9 @@
 --[[
-	SYNAPSE HUB v15 - WITH RESIZE & NOTIFICATIONS
+	SYNAPSE HUB v16 - FLOATING ICON + IMPROVED NOTIFICATIONS
 	by Vanezy Scripts
 ]]
 
-print("START - Synapse Hub v15")
+print("START - Synapse Hub v16")
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -19,7 +19,7 @@ end
 -- =========== CLIPBOARD ===========
 local Clipboard = setclipboard or toclipboard or function() end
 
--- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ===========
+-- =========== НАСТРОЙКИ ===========
 local DEFAULT_SETTINGS = {
 	walkSpeed = 16,
 	jumpPower = 50,
@@ -38,10 +38,11 @@ local DEFAULT_SETTINGS = {
 	infiniteJump = false,
 	rainbow = false,
 	windowWidth = 400,
-	windowHeight = 300
+	windowHeight = 300,
+	floatingX = 10,
+	floatingY = 300
 }
 
--- =========== ТЕКУЩИЕ НАСТРОЙКИ ===========
 local settings = {}
 
 -- =========== ЗАГРУЗКА СОХРАНЕНИЙ ===========
@@ -65,7 +66,6 @@ end
 
 -- =========== ПЕРЕМЕННЫЕ ===========
 local camera = Workspace.CurrentCamera
-local autoRunConnection = nil
 local flyConnection = nil
 local noClipConnection = nil
 local bodyVelocity = nil
@@ -77,7 +77,7 @@ local espPlayersList = {}
 local espChestsList = {}
 local espMobsList = {}
 
-local isMinimized = false
+local isMinimized = true
 local floatingButton = nil
 
 -- =========== СОЗДАНИЕ GUI ===========
@@ -94,7 +94,13 @@ if not ScreenGui.Parent then
 	ScreenGui.Parent = playerGui
 end
 
--- =========== ПЛАВАЮЩАЯ КНОПКА ===========
+-- =========== ПЛАВАЮЩАЯ ИКОНКА ===========
+local function updateFloatingButtonPosition()
+	if floatingButton then
+		floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
+	end
+end
+
 local function createFloatingButton()
 	if floatingButton then
 		floatingButton:Destroy()
@@ -102,17 +108,16 @@ local function createFloatingButton()
 	end
 	
 	floatingButton = Instance.new("TextButton")
-	floatingButton.Size = UDim2.new(0, 50, 0, 50)
-	floatingButton.Position = UDim2.new(0, 10, 0.5, -25)
+	floatingButton.Size = UDim2.new(0, 55, 0, 55)
+	floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
 	floatingButton.Text = "✨"
 	floatingButton.Font = Enum.Font.GothamBold
-	floatingButton.TextSize = 24
+	floatingButton.TextSize = 28
 	floatingButton.TextColor3 = Color3.fromRGB(0, 160, 255)
 	floatingButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	floatingButton.BackgroundTransparency = 0.1
 	floatingButton.BorderSizePixel = 0
-	floatingButton.ZIndex = 400
-	floatingButton.Visible = false
+	floatingButton.ZIndex = 500
 	floatingButton.Parent = ScreenGui
 	
 	local btnCorner = Instance.new("UICorner")
@@ -121,9 +126,10 @@ local function createFloatingButton()
 	
 	local btnStroke = Instance.new("UIStroke")
 	btnStroke.Color = Color3.fromRGB(0, 140, 255)
-	btnStroke.Thickness = 1.5
+	btnStroke.Thickness = 2
 	btnStroke.Parent = floatingButton
 	
+	-- Drag для плавающей иконки
 	local btnDragging = false
 	local btnDragStart, btnStartPos
 	
@@ -138,12 +144,11 @@ local function createFloatingButton()
 	UserInputService.InputChanged:Connect(function(input)
 		if btnDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
 			local delta = input.Position - btnDragStart
-			floatingButton.Position = UDim2.new(
-				btnStartPos.X.Scale,
-				math.clamp(btnStartPos.X.Offset + delta.X, 0, 500),
-				btnStartPos.Y.Scale,
-				math.clamp(btnStartPos.Y.Offset + delta.Y, 0, 700)
-			)
+			local newX = math.clamp(btnStartPos.X.Offset + delta.X, 5, 500)
+			local newY = math.clamp(btnStartPos.Y.Offset + delta.Y, 50, 700)
+			floatingButton.Position = UDim2.new(0, newX, 0, newY)
+			settings.floatingX = newX
+			settings.floatingY = newY
 		end
 	end)
 	
@@ -153,14 +158,19 @@ local function createFloatingButton()
 		end
 	end)
 	
+	-- Клик для открытия/закрытия
 	floatingButton.MouseButton1Click:Connect(function()
-		restoreMenu()
+		if isMinimized then
+			restoreMenu()
+		else
+			minimizeMenu()
+		end
 	end)
 	
 	return floatingButton
 end
 
--- =========== СИСТЕМА УВЕДОМЛЕНИЙ (СПРАВА СВЕРХУ) ===========
+-- =========== УВЕДОМЛЕНИЯ (СПРАВА СВЕРХУ, ВЫШЕ И ПРАВЕЕ) ===========
 local activeNotifications = {}
 local notificationContainer = nil
 
@@ -169,7 +179,7 @@ local function createNotification(text, duration)
 		notificationContainer = Instance.new("Frame")
 		notificationContainer.Name = "NotificationContainer"
 		notificationContainer.Size = UDim2.new(0, 320, 0, 0)
-		notificationContainer.Position = UDim2.new(1, -340, 0, 10)
+		notificationContainer.Position = UDim2.new(1, -330, 0, 50)
 		notificationContainer.BackgroundTransparency = 1
 		notificationContainer.ClipsDescendants = false
 		notificationContainer.ZIndex = 300
@@ -483,9 +493,7 @@ mainStroke.Color = Color3.fromRGB(0, 140, 255)
 mainStroke.Thickness = 1.5
 mainStroke.Parent = MainFrame
 
--- =========== СИСТЕМА РАЗМЕРА ЗА УГЛЫ ===========
-local resizeZones = {}
-
+-- =========== СИСТЕМА РАЗМЕРА ===========
 local function createResizeZone(cursor, position, size)
 	local zone = Instance.new("Frame")
 	zone.Size = UDim2.new(0, size, 0, size)
@@ -505,7 +513,6 @@ local function createResizeZone(cursor, position, size)
 			startPos = MainFrame.Position
 			startSize = MainFrame.Size
 			startMouse = input.Position
-			
 			zone.BackgroundTransparency = 0.5
 			zone.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
 		end
@@ -557,13 +564,12 @@ local function createResizeZone(cursor, position, size)
 	return zone
 end
 
--- Создаём зоны для ресайза по углам
+-- Создаём зоны для ресайза
 local bottomRight = createResizeZone("bottomRight", UDim2.new(1, -12, 1, -12), 20)
 local bottomLeft = createResizeZone("bottomLeft", UDim2.new(0, -8, 1, -12), 20)
 local topRight = createResizeZone("topRight", UDim2.new(1, -12, 0, -8), 20)
 local topLeft = createResizeZone("topLeft", UDim2.new(0, -8, 0, -8), 20)
 
--- Украшаем зоны ресайза (визуальные маркеры)
 for _, zone in pairs({bottomRight, bottomLeft, topRight, topLeft}) do
 	local marker = Instance.new("Frame")
 	marker.Size = UDim2.new(0, 8, 0, 8)
@@ -572,13 +578,12 @@ for _, zone in pairs({bottomRight, bottomLeft, topRight, topLeft}) do
 	marker.BackgroundTransparency = 0.5
 	marker.BorderSizePixel = 0
 	marker.Parent = zone
-	
 	local markerCorner = Instance.new("UICorner")
 	markerCorner.CornerRadius = UDim.new(1, 0)
 	markerCorner.Parent = marker
 end
 
--- Заголовок для Drag
+-- Заголовок
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -596,7 +601,7 @@ TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 16
 TitleText.TextColor3 = Color3.fromRGB(0, 160, 255)
 TitleText.BackgroundTransparency = 1
-TitleText.Size = UDim2.new(1, -80, 0, 25)
+TitleText.Size = UDim2.new(1, -50, 0, 25)
 TitleText.Position = UDim2.new(0, 12, 0, 5)
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = TitleBar
@@ -607,30 +612,15 @@ ByLabel.Font = Enum.Font.Gotham
 ByLabel.TextSize = 10
 ByLabel.TextColor3 = Color3.fromRGB(120, 120, 150)
 ByLabel.BackgroundTransparency = 1
-ByLabel.Size = UDim2.new(1, -80, 0, 15)
+ByLabel.Size = UDim2.new(1, -50, 0, 15)
 ByLabel.Position = UDim2.new(0, 12, 0, 24)
 ByLabel.TextXAlignment = Enum.TextXAlignment.Left
 ByLabel.Parent = TitleBar
 
--- Кнопки
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(1, -70, 0, 5)
-MinimizeBtn.Text = "−"
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 20
-MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-MinimizeBtn.BorderSizePixel = 0
-MinimizeBtn.Parent = TitleBar
-
-local minBtnCorner = Instance.new("UICorner")
-minBtnCorner.CornerRadius = UDim.new(0, 8)
-minBtnCorner.Parent = MinimizeBtn
-
+-- Кнопка закрытия (крестик)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -36, 0, 5)
+CloseBtn.Position = UDim2.new(1, -38, 0, 5)
 CloseBtn.Text = "✕"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
@@ -643,7 +633,7 @@ local closeBtnCorner = Instance.new("UICorner")
 closeBtnCorner.CornerRadius = UDim.new(0, 8)
 closeBtnCorner.Parent = CloseBtn
 
--- Drag System
+-- Drag System для окна
 local dragging = false
 local dragStart, startPos
 
@@ -668,11 +658,12 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- =========== ФУНКЦИИ СВОРАЧИВАНИЯ ===========
+-- =========== ФУНКЦИИ СВОРАЧИВАНИЯ/ВОССТАНОВЛЕНИЯ ===========
 local function minimizeMenu()
 	if isMinimized then return end
 	isMinimized = true
 	
+	-- Прячем главное меню
 	local hideTween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(0, 0, 0, 0)
@@ -682,30 +673,36 @@ local function minimizeMenu()
 		MainFrame.Visible = false
 	end)
 	
+	-- Показываем иконку (если её нет)
 	if not floatingButton then
 		createFloatingButton()
+	else
+		floatingButton.Visible = true
+		local btnAppear = TweenService:Create(floatingButton, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+			BackgroundTransparency = 0.1,
+			Size = UDim2.new(0, 55, 0, 55)
+		})
+		btnAppear:Play()
 	end
-	floatingButton.Visible = true
-	local btnAppear = TweenService:Create(floatingButton, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-		BackgroundTransparency = 0.1,
-		Size = UDim2.new(0, 55, 0, 55)
-	})
-	btnAppear:Play()
 end
 
 local function restoreMenu()
 	if not isMinimized then return end
 	isMinimized = false
 	
-	local btnHide = TweenService:Create(floatingButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 0, 0, 0)
-	})
-	btnHide:Play()
-	btnHide.Completed:Connect(function()
-		floatingButton.Visible = false
-	end)
+	-- Прячем иконку
+	if floatingButton then
+		local btnHide = TweenService:Create(floatingButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			BackgroundTransparency = 1,
+			Size = UDim2.new(0, 0, 0, 0)
+		})
+		btnHide:Play()
+		btnHide.Completed:Connect(function()
+			floatingButton.Visible = false
+		end)
+	end
 	
+	-- Показываем главное меню
 	MainFrame.Visible = true
 	MainFrame.Size = UDim2.new(0, settings.windowWidth, 0, settings.windowHeight)
 	MainFrame.BackgroundTransparency = 0.05
@@ -716,8 +713,7 @@ local function restoreMenu()
 	showTween:Play()
 end
 
-MinimizeBtn.MouseButton1Click:Connect(minimizeMenu)
-
+-- Кнопка закрытия (полное закрытие)
 CloseBtn.MouseButton1Click:Connect(function()
 	if floatingButton then
 		floatingButton:Destroy()
@@ -991,15 +987,8 @@ local flyToggle = createToggle(Content, "Fly Mode", yOffset, settings.flyEnabled
 	settings.flyEnabled = v
 	saveValue("flyEnabled", v)
 	
-	if flyConnection then
-		flyConnection:Disconnect()
-		flyConnection = nil
-	end
-	
-	if bodyVelocity then
-		bodyVelocity:Destroy()
-		bodyVelocity = nil
-	end
+	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+	if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
 	
 	local char = player.Character
 	if v and char then
@@ -1018,28 +1007,16 @@ local flyToggle = createToggle(Content, "Fly Mode", yOffset, settings.flyEnabled
 				local newHrp = newChar:FindFirstChild("HumanoidRootPart")
 				local newHum = newChar:FindFirstChild("Humanoid")
 				if not newHrp or not newHum then return end
-				
-				if bodyVelocity and bodyVelocity.Parent ~= newHrp then
-					bodyVelocity.Parent = newHrp
-				end
-				
+				if bodyVelocity and bodyVelocity.Parent ~= newHrp then bodyVelocity.Parent = newHrp end
 				local move = Vector3.new()
 				local cam = workspace.CurrentCamera
-				local f = cam.CFrame.LookVector
-				local r = cam.CFrame.RightVector
-				
-				if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + f end
-				if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - f end
-				if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + r end
-				if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - r end
+				if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
 				if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
 				if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0, 1, 0) end
-				
-				if move.Magnitude > 0 then
-					bodyVelocity.Velocity = move.Unit * settings.flySpeed
-				else
-					bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-				end
+				bodyVelocity.Velocity = move.Magnitude > 0 and move.Unit * settings.flySpeed or Vector3.zero
 			end)
 		end
 	end
@@ -1063,10 +1040,7 @@ local noclipToggle = createToggle(Content, "Noclip", yOffset, settings.noclip, f
 	settings.noclip = v
 	saveValue("noclip", v)
 	
-	if noClipConnection then
-		noClipConnection:Disconnect()
-		noClipConnection = nil
-	end
+	if noClipConnection then noClipConnection:Disconnect() noClipConnection = nil end
 	
 	if v then
 		noClipConnection = RunService.Stepped:Connect(function()
@@ -1108,6 +1082,7 @@ local espPlayersToggle = createToggle(Content, "ESP Players", yOffset, settings.
 	settings.espPlayers = v
 	saveValue("espPlayers", v)
 	updateESP()
+	if v then createNotification("👤 ESP Players ON", 1.5) else createNotification("👤 ESP Players OFF", 1.5) end
 end)
 yOffset = yOffset + 43
 
@@ -1150,10 +1125,7 @@ local rainbowToggle = createToggle(Content, "Rainbow Mode", yOffset, settings.ra
 	settings.rainbow = v
 	saveValue("rainbow", v)
 	
-	if rainbowConnection then
-		rainbowConnection:Disconnect()
-		rainbowConnection = nil
-	end
+	if rainbowConnection then rainbowConnection:Disconnect() rainbowConnection = nil end
 	
 	if v then
 		rainbowConnection = RunService.RenderStepped:Connect(function()
@@ -1161,6 +1133,11 @@ local rainbowToggle = createToggle(Content, "Rainbow Mode", yOffset, settings.ra
 			local col = Color3.fromHSV(rainbowHue, 1, 1)
 			mainStroke.Color = col
 			TitleText.TextColor3 = col
+			if floatingButton then
+				floatingButton.TextColor3 = col
+				local stroke = floatingButton:FindFirstChild("UIStroke")
+				if stroke then stroke.Color = col end
+			end
 		end)
 	end
 end)
@@ -1229,7 +1206,6 @@ ResetBtn.MouseButton1Click:Connect(function()
 	MainFrame.Size = UDim2.new(0, 400, 0, 300)
 	MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
 	
-	if autoRunConnection then autoRunConnection:Disconnect() autoRunConnection = nil end
 	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
 	if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
 	if noClipConnection then noClipConnection:Disconnect() noClipConnection = nil end
@@ -1291,14 +1267,13 @@ if settings.noclip then
 	end)
 end
 
--- =========== ESP (С ПОЛНОЙ ОЧИСТКОЙ ПРИ ОТКЛЮЧЕНИИ) ===========
+-- =========== ESP (С ПОЛНОЙ ОЧИСТКОЙ) ===========
 function updateESP()
 	if espConnection then
 		espConnection:Disconnect()
 		espConnection = nil
 	end
 	
-	-- Полная очистка всех ESP объектов ПРИ ЛЮБОМ ВЫЗОВЕ
 	for id, data in pairs(espPlayersList) do
 		pcall(function() data.highlight:Destroy() end)
 		pcall(function() data.billboard:Destroy() end)
@@ -1414,7 +1389,6 @@ function updateESP()
 			end
 		end
 		
-		-- ESP Chests
 		if settings.espChests then
 			for _, obj in pairs(Workspace:GetDescendants()) do
 				if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("crate") or obj.Name:lower():find("barrel")) then
@@ -1432,7 +1406,6 @@ function updateESP()
 			end
 		end
 		
-		-- ESP Mobs
 		if settings.espMobs then
 			for _, obj in pairs(Workspace:GetDescendants()) do
 				if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= player.Character then
@@ -1544,13 +1517,17 @@ if autoStart then
 	end
 end
 
--- =========== ПОКАЗЫВАЕМ МЕНЮ ===========
+-- =========== ЗАПУСК ===========
 task.wait(5.5)
-MainFrame.Visible = true
-local menuAppear = TweenService:Create(MainFrame, TweenInfo.new(0.4), {BackgroundTransparency = 0.05})
-menuAppear:Play()
 
-createNotification("✨ Script Loaded!", 2)
+-- Создаём плавающую иконку и показываем её (скрипт стартует в свёрнутом виде)
+createFloatingButton()
+floatingButton.Visible = true
+floatingButton.Position = UDim2.new(0, 10, 0.5, -27)
+settings.floatingX = 10
+settings.floatingY = math.floor(floatingButton.Position.Y.Offset)
 
-print("✅ Synapse Hub v15 loaded!")
+createNotification("✨ Script Loaded! Click ✨ to open", 3)
+
+print("✅ Synapse Hub v16 loaded!")
 print("📢 Telegram: @VanezyScripts")
