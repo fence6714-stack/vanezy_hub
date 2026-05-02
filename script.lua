@@ -2255,7 +2255,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- =========== ЗАПУСК ===========
-task.wait(5.5)
+task.wait(8.5)
 
 createFloatingButton()
 floatingButton.Visible = true
