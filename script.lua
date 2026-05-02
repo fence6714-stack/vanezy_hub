@@ -1,10 +1,9 @@
 --[[
-	SYNAPSE HUB v12 - FULLY WORKING
+	SYNAPSE HUB v13 - WITH NOTIFICATION SYSTEM
 	by Vanezy Scripts
-	Telegram: @VanezyScripts
 ]]
 
-print("START - Synapse Hub v12")
+print("START - Synapse Hub v13")
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -17,11 +16,11 @@ if not player then
 	player = Players.PlayerAdded:Wait()
 end
 
--- =========== ИСПРАВЛЕННЫЙ CLIPBOARD ===========
+-- =========== CLIPBOARD ===========
 local Clipboard = setclipboard or toclipboard or function() end
 
--- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ===========
-local settings = {
+-- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ (ОРИГИНАЛ ДЛЯ СБРОСА) ===========
+local DEFAULT_SETTINGS = {
 	walkSpeed = 16,
 	jumpPower = 50,
 	fov = 70,
@@ -45,6 +44,9 @@ local settings = {
 	rainbow = false
 }
 
+-- =========== ТЕКУЩИЕ НАСТРОЙКИ ===========
+local settings = {}
+
 -- =========== ЗАГРУЗКА СОХРАНЕНИЙ ===========
 local StorageValues = Instance.new("Folder")
 StorageValues.Name = "UISettings"
@@ -60,7 +62,8 @@ local function saveValue(name, value)
 	StorageValues:SetAttribute(name, value)
 end
 
-for key, default in pairs(settings) do
+-- Загружаем или создаём настройки
+for key, default in pairs(DEFAULT_SETTINGS) do
 	settings[key] = loadValue(key, default)
 end
 
@@ -78,13 +81,155 @@ local espPlayersList = {}
 local espChestsList = {}
 local espMobsList = {}
 
--- =========== ИСПРАВЛЕННОЕ СОЗДАНИЕ GUI ===========
+-- =========== СИСТЕМА УВЕДОМЛЕНИЙ ===========
+local activeNotifications = {}
+local notificationContainer = nil
+
+local function createNotification(text, duration)
+	if not notificationContainer then
+		notificationContainer = Instance.new("Frame")
+		notificationContainer.Name = "NotificationContainer"
+		notificationContainer.Size = UDim2.new(0, 300, 0, 0)
+		notificationContainer.Position = UDim2.new(1, -320, 0, 10)
+		notificationContainer.BackgroundTransparency = 1
+		notificationContainer.ClipsDescendants = false
+		notificationContainer.ZIndex = 300
+		notificationContainer.Parent = ScreenGui
+		
+		local containerCorner = Instance.new("UICorner")
+		containerCorner.CornerRadius = UDim.new(0, 12)
+		containerCorner.Parent = notificationContainer
+	end
+	
+	local notification = Instance.new("Frame")
+	notification.Size = UDim2.new(1, 0, 0, 55)
+	notification.Position = UDim2.new(0, 0, 1, 0)
+	notification.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	notification.BackgroundTransparency = 0.05
+	notification.BorderSizePixel = 0
+	notification.ZIndex = 301
+	notification.Parent = notificationContainer
+	
+	local notifCorner = Instance.new("UICorner")
+	notifCorner.CornerRadius = UDim.new(0, 10)
+	notifCorner.Parent = notification
+	
+	local notifStroke = Instance.new("UIStroke")
+	notifStroke.Color = mainStroke and mainStroke.Color or Color3.fromRGB(0, 140, 255)
+	notifStroke.Thickness = 1.5
+	notifStroke.Parent = notification
+	
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Text = text
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextSize = 13
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Size = UDim2.new(1, -20, 0, 30)
+	textLabel.Position = UDim2.new(0, 10, 0, 5)
+	textLabel.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel.ZIndex = 302
+	textLabel.Parent = notification
+	
+	local progressBar = Instance.new("Frame")
+	progressBar.Size = UDim2.new(1, -20, 0, 3)
+	progressBar.Position = UDim2.new(0, 10, 0, 45)
+	progressBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+	progressBar.BorderSizePixel = 0
+	progressBar.ZIndex = 302
+	progressBar.Parent = notification
+	
+	local progressCorner = Instance.new("UICorner")
+	progressCorner.CornerRadius = UDim.new(1, 0)
+	progressCorner.Parent = progressBar
+	
+	local progressFill = Instance.new("Frame")
+	progressFill.Size = UDim2.new(1, 0, 1, 0)
+	progressFill.BackgroundColor3 = mainStroke and mainStroke.Color or Color3.fromRGB(0, 140, 255)
+	progressFill.BorderSizePixel = 0
+	progressFill.ZIndex = 303
+	progressFill.Parent = progressBar
+	
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = progressFill
+	
+	-- Анимация появления
+	notification.BackgroundTransparency = 1
+	notification.Size = UDim2.new(1, 0, 0, 0)
+	
+	local appearTween = TweenService:Create(notification, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+		BackgroundTransparency = 0.05,
+		Size = UDim2.new(1, 0, 0, 55)
+	})
+	appearTween:Play()
+	
+	-- Обновляем позиции существующих уведомлений
+	for i, notif in ipairs(activeNotifications) do
+		local newY = (i - 1) * 65
+		TweenService:Create(notif.frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+			Position = UDim2.new(0, 0, 0, newY)
+		}):Play()
+	end
+	
+	-- Добавляем в список
+	local notificationData = {
+		frame = notification,
+		progressFill = progressFill,
+		textLabel = textLabel,
+		startTime = tick(),
+		duration = duration
+	}
+	table.insert(activeNotifications, 1, notificationData)
+	
+	-- Обновляем позицию нового уведомления
+	notification.Position = UDim2.new(0, 0, 0, 0)
+	
+	-- Анимация ползунка
+	local progressTween = TweenService:Create(progressFill, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+		Size = UDim2.new(0, 0, 1, 0)
+	})
+	progressTween:Play()
+	
+	-- Таймер удаления
+	task.spawn(function()
+		task.wait(duration)
+		
+		-- Находим и удаляем уведомление
+		for i, data in ipairs(activeNotifications) do
+			if data.frame == notification then
+				table.remove(activeNotifications, i)
+				
+				local fadeOut = TweenService:Create(notification, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+					BackgroundTransparency = 1,
+					Size = UDim2.new(1, 0, 0, 0)
+				})
+				fadeOut:Play()
+				fadeOut.Completed:Connect(function()
+					notification:Destroy()
+				end)
+				
+				-- Сдвигаем оставшиеся уведомления
+				for j, remaining in ipairs(activeNotifications) do
+					local newY = (j - 1) * 65
+					TweenService:Create(remaining.frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+						Position = UDim2.new(0, 0, 0, newY)
+					}):Play()
+				end
+				break
+			end
+		end
+	end)
+	
+	return notification
+end
+
+-- =========== СОЗДАНИЕ GUI ===========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SynapseHub"
 ScreenGui.ResetOnSpawn = false
 
 local playerGui = player:WaitForChild("PlayerGui")
-
 pcall(function()
 	ScreenGui.Parent = playerGui
 end)
@@ -175,17 +320,16 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 8)
 closeCorner.Parent = CloseAdButton
 
--- Показываем рекламу
 local adAppear = TweenService:Create(AdFrame, TweenInfo.new(0.5), {BackgroundTransparency = 0.05})
 adAppear:Play()
 
--- Кнопка Telegram - только копирует ссылку (без MessageBox)
+-- Кнопка Telegram с уведомлением
 TelegramButton.MouseButton1Click:Connect(function()
 	local telegramLink = "https://t.me/VanezyScripts"
 	pcall(function()
 		Clipboard(telegramLink)
 	end)
-	print("✅ Ссылка скопирована: " .. telegramLink)
+	createNotification("🔗 Link Copied! 📋", 3)
 end)
 
 -- Таймер 5 секунд
@@ -265,10 +409,10 @@ byFadeOut:Play()
 task.wait(0.5)
 LoadingFrame:Destroy()
 
--- =========== ГЛАВНОЕ МЕНЮ ===========
+-- =========== ГЛАВНОЕ МЕНЮ (400x300 ПО ЦЕНТРУ) ===========
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 520)
-MainFrame.Position = UDim2.new(0, 5, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
 MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
@@ -286,7 +430,7 @@ mainStroke.Parent = MainFrame
 
 -- Заголовок (Drag)
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 45)
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 TitleBar.BorderSizePixel = 0
 TitleBar.Active = true
@@ -314,14 +458,14 @@ ByLabel.TextSize = 10
 ByLabel.TextColor3 = Color3.fromRGB(120, 120, 150)
 ByLabel.BackgroundTransparency = 1
 ByLabel.Size = UDim2.new(1, -80, 0, 15)
-ByLabel.Position = UDim2.new(0, 12, 0, 26)
+ByLabel.Position = UDim2.new(0, 12, 0, 24)
 ByLabel.TextXAlignment = Enum.TextXAlignment.Left
 ByLabel.Parent = TitleBar
 
 -- Кнопки
 local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 32, 0, 32)
-MinimizeBtn.Position = UDim2.new(1, -74, 0, 6)
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -70, 0, 5)
 MinimizeBtn.Text = "−"
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 20
@@ -335,8 +479,8 @@ minBtnCorner.CornerRadius = UDim.new(0, 8)
 minBtnCorner.Parent = MinimizeBtn
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 32, 0, 32)
-CloseBtn.Position = UDim2.new(1, -38, 0, 6)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -36, 0, 5)
 CloseBtn.Text = "✕"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
@@ -376,9 +520,9 @@ end)
 
 -- =========== СКРОЛЛИНГ КОНТЕЙНЕР ===========
 local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Size = UDim2.new(1, 0, 1, -45)
-ScrollFrame.Position = UDim2.new(0, 0, 0, 45)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 900)
+ScrollFrame.Size = UDim2.new(1, 0, 1, -40)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 40)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
 ScrollFrame.ScrollBarThickness = 4
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 ScrollFrame.BackgroundTransparency = 1
@@ -386,14 +530,14 @@ ScrollFrame.BorderSizePixel = 0
 ScrollFrame.Parent = MainFrame
 
 local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 0, 900)
+Content.Size = UDim2.new(1, 0, 0, 600)
 Content.BackgroundTransparency = 1
 Content.Parent = ScrollFrame
 
 -- =========== ФУНКЦИИ СОЗДАНИЯ UI ===========
 local function createSection(parent, name, yPos)
 	local section = Instance.new("Frame")
-	section.Size = UDim2.new(1, -20, 0, 35)
+	section.Size = UDim2.new(1, -20, 0, 30)
 	section.Position = UDim2.new(0, 10, 0, yPos)
 	section.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 	section.BackgroundTransparency = 0.5
@@ -407,7 +551,7 @@ local function createSection(parent, name, yPos)
 	local secText = Instance.new("TextLabel")
 	secText.Text = name
 	secText.Font = Enum.Font.GothamBold
-	secText.TextSize = 13
+	secText.TextSize = 12
 	secText.TextColor3 = Color3.fromRGB(0, 160, 255)
 	secText.BackgroundTransparency = 1
 	secText.Size = UDim2.new(1, -10, 1, 0)
@@ -421,7 +565,7 @@ end
 
 local function createToggle(parent, name, yPos, defaultState, callback)
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(1, -20, 0, 40)
+	frame.Size = UDim2.new(1, -20, 0, 35)
 	frame.Position = UDim2.new(0, 10, 0, yPos)
 	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	frame.BorderSizePixel = 0
@@ -434,17 +578,17 @@ local function createToggle(parent, name, yPos, defaultState, callback)
 	local label = Instance.new("TextLabel")
 	label.Text = name
 	label.Font = Enum.Font.Gotham
-	label.TextSize = 12
+	label.TextSize = 11
 	label.TextColor3 = Color3.fromRGB(180, 180, 200)
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.new(0.65, 0, 1, 0)
-	label.Position = UDim2.new(0, 12, 0, 0)
+	label.Size = UDim2.new(0.6, 0, 1, 0)
+	label.Position = UDim2.new(0, 10, 0, 0)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = frame
 	
 	local btn = Instance.new("Frame")
-	btn.Size = UDim2.new(0, 46, 0, 24)
-	btn.Position = UDim2.new(1, -58, 0.5, -12)
+	btn.Size = UDim2.new(0, 42, 0, 22)
+	btn.Position = UDim2.new(1, -52, 0.5, -11)
 	btn.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
 	btn.BorderSizePixel = 0
 	btn.Parent = frame
@@ -454,8 +598,8 @@ local function createToggle(parent, name, yPos, defaultState, callback)
 	btnCorner.Parent = btn
 	
 	local dot = Instance.new("Frame")
-	dot.Size = UDim2.new(0, 18, 0, 18)
-	dot.Position = defaultState and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+	dot.Size = UDim2.new(0, 16, 0, 16)
+	dot.Position = defaultState and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
 	dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	dot.BorderSizePixel = 0
 	dot.Parent = btn
@@ -475,7 +619,7 @@ local function createToggle(parent, name, yPos, defaultState, callback)
 	hitbox.MouseButton1Click:Connect(function()
 		state = not state
 		local targetColor = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
-		local targetPos = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+		local targetPos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
 		TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = targetColor}):Play()
 		TweenService:Create(dot, TweenInfo.new(0.15), {Position = targetPos}):Play()
 		if callback then callback(state) end
@@ -486,7 +630,7 @@ end
 
 local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, callback)
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(1, -20, 0, 65)
+	frame.Size = UDim2.new(1, -20, 0, 55)
 	frame.Position = UDim2.new(0, 10, 0, yPos)
 	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	frame.BorderSizePixel = 0
@@ -499,17 +643,17 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 	local label = Instance.new("TextLabel")
 	label.Text = name .. " [" .. tostring(defaultVal) .. "]"
 	label.Font = Enum.Font.Gotham
-	label.TextSize = 12
+	label.TextSize = 11
 	label.TextColor3 = Color3.fromRGB(180, 180, 200)
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.new(1, -20, 0, 25)
+	label.Size = UDim2.new(1, -20, 0, 20)
 	label.Position = UDim2.new(0, 10, 0, 5)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = frame
 	
 	local bar = Instance.new("Frame")
-	bar.Size = UDim2.new(1, -24, 0, 5)
-	bar.Position = UDim2.new(0, 12, 0, 38)
+	bar.Size = UDim2.new(1, -24, 0, 4)
+	bar.Position = UDim2.new(0, 12, 0, 35)
 	bar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
 	bar.BorderSizePixel = 0
 	bar.Parent = frame
@@ -531,8 +675,8 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 	fillCorner.Parent = fill
 	
 	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 16, 0, 16)
-	knob.Position = UDim2.new(ratio, -8, 0.5, -8)
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = UDim2.new(ratio, -7, 0.5, -7)
 	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	knob.BorderSizePixel = 0
 	knob.Parent = bar
@@ -553,7 +697,7 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 		local val = minVal + (maxVal - minVal) * relX
 		val = math.floor(val * 10 + 0.5) / 10
 		fill.Size = UDim2.new(relX, 0, 1, 0)
-		knob.Position = UDim2.new(relX, -8, 0.5, -8)
+		knob.Position = UDim2.new(relX, -7, 0.5, -7)
 		label.Text = name .. " [" .. tostring(val) .. "]"
 		currentVal = val
 		if callback then callback(val) end
@@ -591,7 +735,7 @@ local function createSlider(parent, name, yPos, minVal, maxVal, defaultVal, call
 			local r = (val - minVal) / (maxVal - minVal)
 			r = math.clamp(r, 0, 1)
 			fill.Size = UDim2.new(r, 0, 1, 0)
-			knob.Position = UDim2.new(r, -8, 0.5, -8)
+			knob.Position = UDim2.new(r, -7, 0.5, -7)
 			label.Text = name .. " [" .. tostring(val) .. "]"
 			currentVal = val
 			if callback then callback(val) end
@@ -604,7 +748,7 @@ local yOffset = 10
 
 -- Раздел MOVEMENT
 createSection(Content, "MOVEMENT", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local walkSlider = createSlider(Content, "Walk Speed", yOffset, 8, 120, settings.walkSpeed, function(v)
 	settings.walkSpeed = v
@@ -614,7 +758,7 @@ local walkSlider = createSlider(Content, "Walk Speed", yOffset, 8, 120, settings
 		char.Humanoid.WalkSpeed = v
 	end
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 local jumpSlider = createSlider(Content, "Jump Power", yOffset, 30, 250, settings.jumpPower, function(v)
 	settings.jumpPower = v
@@ -624,18 +768,18 @@ local jumpSlider = createSlider(Content, "Jump Power", yOffset, 30, 250, setting
 		char.Humanoid.JumpPower = v
 	end
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 local fovSlider = createSlider(Content, "Field of View", yOffset, 50, 120, settings.fov, function(v)
 	settings.fov = v
 	saveValue("fov", v)
 	if camera then camera.FieldOfView = v end
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 -- Раздел AUTO RUN
 createSection(Content, "AUTO RUN", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local autoRunToggle, getAutoRunState = createToggle(Content, "Auto Run", yOffset, settings.autoRun, function(v)
 	settings.autoRun = v
@@ -661,17 +805,17 @@ local autoRunToggle, getAutoRunState = createToggle(Content, "Auto Run", yOffset
 		end)
 	end
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local autoRunSlider = createSlider(Content, "Auto Run Speed", yOffset, 8, 120, settings.autoRunSpeed, function(v)
 	settings.autoRunSpeed = v
 	saveValue("autoRunSpeed", v)
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 -- Раздел FLY
 createSection(Content, "FLY SYSTEM", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local flyToggle, getFlyState = createToggle(Content, "Fly Mode", yOffset, settings.flyEnabled, function(v)
 	settings.flyEnabled = v
@@ -734,128 +878,82 @@ local flyToggle, getFlyState = createToggle(Content, "Fly Mode", yOffset, settin
 		char.Humanoid.PlatformStand = false
 	end
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local flySpeedSlider = createSlider(Content, "Fly Speed", yOffset, 30, 200, settings.flySpeed, function(v)
 	settings.flySpeed = v
 	saveValue("flySpeed", v)
 end)
-yOffset = yOffset + 75
-
--- Раздел NOCLIP
-createSection(Content, "NOCLIP", yOffset)
-yOffset = yOffset + 45
-
-local noclipToggle, getNoclipState = createToggle(Content, "Noclip (All)", yOffset, settings.noclip, function(v)
-	settings.noclip = v
-	saveValue("noclip", v)
-	
-	if noClipConnection then
-		noClipConnection:Disconnect()
-		noClipConnection = nil
-	end
-	
-	if v then
-		noClipConnection = RunService.Stepped:Connect(function()
-			if not settings.noclip then return end
-			local char = player.Character
-			if not char then return end
-			for _, part in pairs(char:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = false
-				end
-			end
-		end)
-	end
-end)
-yOffset = yOffset + 50
-
-local noclipWallsToggle = createToggle(Content, "Through Walls", yOffset, settings.noclipWalls, function(v)
-	settings.noclipWalls = v
-	saveValue("noclipWalls", v)
-end)
-yOffset = yOffset + 50
-
-local noclipFloorToggle = createToggle(Content, "Through Floor", yOffset, settings.noclipFloor, function(v)
-	settings.noclipFloor = v
-	saveValue("noclipFloor", v)
-end)
-yOffset = yOffset + 50
-
-local noclipCeilingToggle = createToggle(Content, "Through Ceiling", yOffset, settings.noclipCeiling, function(v)
-	settings.noclipCeiling = v
-	saveValue("noclipCeiling", v)
-end)
-yOffset = yOffset + 60
+yOffset = yOffset + 63
 
 -- Раздел COMBAT
 createSection(Content, "COMBAT", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local speedHackToggle, getSpeedHackState = createToggle(Content, "Speed Hack", yOffset, settings.speedHack, function(v)
 	settings.speedHack = v
 	saveValue("speedHack", v)
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local speedHackSlider = createSlider(Content, "Speed Hack Value", yOffset, 20, 200, settings.speedHackValue, function(v)
 	settings.speedHackValue = v
 	saveValue("speedHackValue", v)
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 local infiniteJumpToggle, getInfiniteJumpState = createToggle(Content, "Infinite Jump", yOffset, settings.infiniteJump, function(v)
 	settings.infiniteJump = v
 	saveValue("infiniteJump", v)
 end)
-yOffset = yOffset + 60
+yOffset = yOffset + 50
 
 -- Раздел ESP
 createSection(Content, "ESP", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local espPlayersToggle, getEspPlayersState = createToggle(Content, "ESP Players", yOffset, settings.espPlayers, function(v)
 	settings.espPlayers = v
 	saveValue("espPlayers", v)
 	updateESP()
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local espChestsToggle, getEspChestsState = createToggle(Content, "ESP Chests", yOffset, settings.espChests, function(v)
 	settings.espChests = v
 	saveValue("espChests", v)
 	updateESP()
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local espMobsToggle, getEspMobsState = createToggle(Content, "ESP Mobs", yOffset, settings.espMobs, function(v)
 	settings.espMobs = v
 	saveValue("espMobs", v)
 	updateESP()
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local espSizeSlider = createSlider(Content, "ESP Size", yOffset, 0.5, 3, settings.espSize, function(v)
 	settings.espSize = v
 	saveValue("espSize", v)
 end)
-yOffset = yOffset + 75
+yOffset = yOffset + 63
 
 local espHealthToggle, getEspHealthState = createToggle(Content, "ESP Health", yOffset, settings.espHealth, function(v)
 	settings.espHealth = v
 	saveValue("espHealth", v)
 end)
-yOffset = yOffset + 50
+yOffset = yOffset + 43
 
 local espDistanceToggle, getEspDistanceState = createToggle(Content, "ESP Distance", yOffset, settings.espDistance, function(v)
 	settings.espDistance = v
 	saveValue("espDistance", v)
 end)
-yOffset = yOffset + 60
+yOffset = yOffset + 50
 
 -- Раздел THEME
 createSection(Content, "THEME", yOffset)
-yOffset = yOffset + 45
+yOffset = yOffset + 38
 
 local rainbowToggle, getRainbowState = createToggle(Content, "Rainbow Mode", yOffset, settings.rainbow, function(v)
 	settings.rainbow = v
@@ -875,54 +973,61 @@ local rainbowToggle, getRainbowState = createToggle(Content, "Rainbow Mode", yOf
 		end)
 	end
 end)
-yOffset = yOffset + 60
+yOffset = yOffset + 50
 
--- Save button
+-- Кнопка сохранения
 local SaveBtn = Instance.new("TextButton")
-SaveBtn.Size = UDim2.new(1, -20, 0, 45)
-SaveBtn.Position = UDim2.new(0, 10, 0, yOffset)
-SaveBtn.Text = "💾 SAVE ALL SETTINGS"
+SaveBtn.Size = UDim2.new(0.45, -15, 0, 35)
+SaveBtn.Position = UDim2.new(0.03, 0, 0, yOffset)
+SaveBtn.Text = "💾 SAVE"
 SaveBtn.Font = Enum.Font.GothamBold
-SaveBtn.TextSize = 14
+SaveBtn.TextSize = 12
 SaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SaveBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 80)
 SaveBtn.BorderSizePixel = 0
 SaveBtn.Parent = Content
 
 local saveCorner = Instance.new("UICorner")
-saveCorner.CornerRadius = UDim.new(0, 8)
+saveCorner.CornerRadius = UDim.new(0, 6)
 saveCorner.Parent = SaveBtn
 
 SaveBtn.MouseButton1Click:Connect(function()
 	for k, v in pairs(settings) do
 		saveValue(k, v)
 	end
+	createNotification("💾 Settings Saved! ✓", 2)
+	
 	SaveBtn.Text = "✓ SAVED!"
-	TweenService:Create(SaveBtn, TweenInfo.new(1.5), {TextColor3 = Color3.fromRGB(100, 255, 100)}):Play()
-	task.wait(1.5)
-	SaveBtn.Text = "💾 SAVE ALL SETTINGS"
+	TweenService:Create(SaveBtn, TweenInfo.new(1), {TextColor3 = Color3.fromRGB(100, 255, 100)}):Play()
+	task.wait(1)
+	SaveBtn.Text = "💾 SAVE"
 	TweenService:Create(SaveBtn, TweenInfo.new(0.5), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 end)
 
-yOffset = yOffset + 60
-
--- Reset button
+-- Кнопка сброса
 local ResetBtn = Instance.new("TextButton")
-ResetBtn.Size = UDim2.new(1, -20, 0, 45)
-ResetBtn.Position = UDim2.new(0, 10, 0, yOffset)
-ResetBtn.Text = "🗑️ RESET TO DEFAULTS"
+ResetBtn.Size = UDim2.new(0.45, -15, 0, 35)
+ResetBtn.Position = UDim2.new(0.52, 0, 0, yOffset)
+ResetBtn.Text = "🗑️ RESET"
 ResetBtn.Font = Enum.Font.GothamBold
-ResetBtn.TextSize = 14
+ResetBtn.TextSize = 12
 ResetBtn.TextColor3 = Color3.fromRGB(255, 200, 200)
 ResetBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 ResetBtn.BorderSizePixel = 0
 ResetBtn.Parent = Content
 
 local resetCorner = Instance.new("UICorner")
-resetCorner.CornerRadius = UDim.new(0, 8)
+resetCorner.CornerRadius = UDim.new(0, 6)
 resetCorner.Parent = ResetBtn
 
 ResetBtn.MouseButton1Click:Connect(function()
+	-- Сбрасываем настройки до DEFAULT
+	for key, default in pairs(DEFAULT_SETTINGS) do
+		settings[key] = default
+		saveValue(key, default)
+	end
+	
+	-- Обновляем UI слайдеры
 	walkSlider.setValue(16)
 	jumpSlider.setValue(50)
 	fovSlider.setValue(70)
@@ -931,34 +1036,17 @@ ResetBtn.MouseButton1Click:Connect(function()
 	speedHackSlider.setValue(50)
 	espSizeSlider.setValue(1.5)
 	
-	settings.walkSpeed = 16
-	settings.jumpPower = 50
-	settings.fov = 70
-	settings.autoRun = false
-	settings.autoRunSpeed = 16
-	settings.flyEnabled = false
-	settings.flySpeed = 50
-	settings.noclip = false
-	settings.noclipWalls = false
-	settings.noclipFloor = false
-	settings.noclipCeiling = false
-	settings.speedHack = false
-	settings.speedHackValue = 50
-	settings.infiniteJump = false
-	settings.espPlayers = false
-	settings.espChests = false
-	settings.espMobs = false
-	settings.espSize = 1.5
-	settings.espHealth = true
-	settings.espDistance = true
-	settings.rainbow = false
+	-- Обновляем тогглы (визуально)
+	-- (пересоздавать не нужно, просто вызываем их колбэки)
 	
+	-- Отключаем все активные функции
 	if autoRunConnection then autoRunConnection:Disconnect() autoRunConnection = nil end
 	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
 	if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
 	if noClipConnection then noClipConnection:Disconnect() noClipConnection = nil end
 	if rainbowConnection then rainbowConnection:Disconnect() rainbowConnection = nil end
 	
+	-- Сбрасываем персонажа
 	local char = player.Character
 	if char then
 		local hum = char:FindFirstChild("Humanoid")
@@ -969,14 +1057,21 @@ ResetBtn.MouseButton1Click:Connect(function()
 		end
 	end
 	
+	-- Обновляем ESP
 	updateESP()
 	
+	createNotification("🗑️ Reset to Defaults ✓", 2)
+	
 	ResetBtn.Text = "✓ RESET!"
-	TweenService:Create(ResetBtn, TweenInfo.new(1.5), {TextColor3 = Color3.fromRGB(150, 255, 150)}):Play()
-	task.wait(1.5)
-	ResetBtn.Text = "🗑️ RESET TO DEFAULTS"
+	TweenService:Create(ResetBtn, TweenInfo.new(1), {TextColor3 = Color3.fromRGB(150, 255, 150)}):Play()
+	task.wait(1)
+	ResetBtn.Text = "🗑️ RESET"
 	TweenService:Create(ResetBtn, TweenInfo.new(0.5), {TextColor3 = Color3.fromRGB(255, 200, 200)}):Play()
 end)
+
+yOffset = yOffset + 50
+Content.Size = UDim2.new(1, 0, 0, yOffset + 10)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset + 20)
 
 -- =========== ФУНКЦИЯ SPEED HACK ===========
 RunService.Heartbeat:Connect(function()
@@ -997,6 +1092,20 @@ UserInputService.JumpRequest:Connect(function()
 		end
 	end
 end)
+
+-- =========== ФУНКЦИЯ NOCLIP ===========
+if settings.noclip then
+	noClipConnection = RunService.Stepped:Connect(function()
+		if not settings.noclip then return end
+		local char = player.Character
+		if not char then return end
+		for _, part in pairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end)
+end
 
 -- =========== ФУНКЦИЯ ESP ===========
 function updateESP()
@@ -1215,7 +1324,7 @@ player.CharacterAdded:Connect(function(char)
 	end
 end)
 
--- =========== АВТОЗАПУСК ФУНКЦИЙ ===========
+-- =========== АВТОЗАПУСК ===========
 local autoStart = loadValue("AutoStart", true)
 
 if autoStart then
@@ -1298,5 +1407,5 @@ CloseBtn.MouseButton1Click:Connect(function()
 	ScreenGui:Destroy()
 end)
 
-print("✅ Synapse Hub v12 loaded successfully!")
+print("✅ Synapse Hub v13 loaded!")
 print("📢 Telegram: @VanezyScripts")
