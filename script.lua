@@ -1,6 +1,6 @@
 --[[
-	SYNAPSE STYLE UI - COMPLETE LOCALSCRIPT v3
-	Fixed: minimize bug, auto walk, save system, ESP, reset button, mobile optimization
+	SYNAPSE STYLE UI v4 - STABLE VERSION
+	No ?. operator, full nil protection, executor compatible
 ]]
 
 local Players = game:GetService("Players")
@@ -9,17 +9,22 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
+if not player then
+	warn("Player not found! Waiting...")
+	player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+end
 
--- Values storage using Instance attributes
+-- Values storage
 local StorageValues = Instance.new("Folder")
 StorageValues.Name = "UISettings"
 StorageValues.Parent = player
 
--- Load saved values or defaults
 local function loadValue(name, default)
 	local val = StorageValues:GetAttribute(name)
-	return val ~= nil and val or default
+	if val ~= nil then
+		return val
+	end
+	return default
 end
 
 local function saveValue(name, value)
@@ -40,24 +45,76 @@ local espEnabled = savedESP
 local espHighlights = {}
 local espBillboards = {}
 
--- Wait for character
-local character, humanoid, camera
+-- Character variables
+local character = nil
+local humanoid = nil
+local camera = nil
+
 local function getChar()
-	character = player.Character or player.CharacterAdded:Wait()
+	local char = player.Character
+	if char then
+		character = char
+		local hum = char:FindFirstChild("Humanoid")
+		if hum then
+			humanoid = hum
+			humanoid.WalkSpeed = savedWalkSpeed
+			humanoid.JumpPower = savedJumpPower
+		end
+	end
+	if workspace.CurrentCamera then
+		camera = workspace.CurrentCamera
+		camera.FieldOfView = savedFOV
+	end
+end
+
+-- Try initial get
+getChar()
+
+-- Wait for character if not loaded
+if not character then
+	character = player.CharacterAdded:Wait()
 	humanoid = character:WaitForChild("Humanoid")
-	camera = workspace.CurrentCamera
 	humanoid.WalkSpeed = savedWalkSpeed
 	humanoid.JumpPower = savedJumpPower
-	camera.FieldOfView = savedFOV
 end
-getChar()
+if not camera then
+	camera = workspace.CurrentCamera
+	if camera then
+		camera.FieldOfView = savedFOV
+	end
+end
+
+-- Safe PlayerGui getter
+local function getGui()
+	local gui = player:FindFirstChild("PlayerGui")
+	if not gui then
+		pcall(function()
+			gui = player:WaitForChild("PlayerGui", 5)
+		end)
+	end
+	return gui
+end
 
 -- Create ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "SynapseUI"
-ScreenGui.Parent = player:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local parentGui = getGui()
+if parentGui then
+	ScreenGui.Parent = parentGui
+else
+	warn("PlayerGui not found, using CoreGui")
+	-- Fallback for executors
+	local success = pcall(function()
+		local CoreGui = game:GetService("CoreGui")
+		ScreenGui.Parent = CoreGui
+	end)
+	if not success then
+		ScreenGui.Parent = game:GetService("StarterGui")
+	end
+end
 
 -- =========== LOADING SCREEN ===========
 local LoadingFrame = Instance.new("Frame")
@@ -117,9 +174,11 @@ local moveConnection = nil
 local releaseConnection = nil
 
 local function getInputPosition(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement or 
-	   input.UserInputType == Enum.UserInputType.MouseButton1 or 
-	   input.UserInputType == Enum.UserInputType.Touch then
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		return input.Position
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+		return input.Position
+	elseif input.UserInputType == Enum.UserInputType.Touch then
 		return input.Position
 	end
 	return nil
@@ -156,11 +215,18 @@ TitleBar.InputBegan:Connect(function(input)
 
 			if moveConnection then moveConnection:Disconnect() end
 			moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
-				if isDraggingWindow and (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) then
-					local movePos = getInputPosition(moveInput)
-					if movePos and dragStartPos then
-						local delta = movePos - dragStartPos
-						MainContainer.Position = UDim2.new(dragStartGuiPos.X.Scale, dragStartGuiPos.X.Offset + delta.X, dragStartGuiPos.Y.Scale, dragStartGuiPos.Y.Offset + delta.Y)
+				if isDraggingWindow then
+					if moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch then
+						local movePos = getInputPosition(moveInput)
+						if movePos and dragStartPos then
+							local delta = movePos - dragStartPos
+							MainContainer.Position = UDim2.new(
+								dragStartGuiPos.X.Scale, 
+								dragStartGuiPos.X.Offset + delta.X, 
+								dragStartGuiPos.Y.Scale, 
+								dragStartGuiPos.Y.Offset + delta.Y
+							)
+						end
 					end
 				end
 			end)
@@ -191,14 +257,14 @@ MinimizeButton.BorderSizePixel = 0
 MinimizeButton.ZIndex = 12
 MinimizeButton.Parent = TitleBar
 
--- Close button with X symbol using Unicode
+-- Close button with red X
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 28, 1, -4)
 CloseButton.Position = UDim2.new(1, -34, 0, 2)
-CloseButton.Text = "✘"  -- Heavy X symbol
+CloseButton.Text = "✘"
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 16
-CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)  -- Red X
+CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)
 CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 CloseButton.BorderSizePixel = 0
 CloseButton.ZIndex = 12
@@ -213,7 +279,7 @@ TabFrame.BorderSizePixel = 0
 TabFrame.ZIndex = 11
 TabFrame.Parent = MainFrame
 
--- Content container with scrolling
+-- Content container
 local ContentContainer = Instance.new("Frame")
 ContentContainer.Size = UDim2.new(1, -120, 1, -35)
 ContentContainer.Position = UDim2.new(0, 120, 0, 35)
@@ -223,7 +289,7 @@ ContentContainer.ClipsDescendants = true
 ContentContainer.ZIndex = 11
 ContentContainer.Parent = MainFrame
 
--- Buttons
+-- Tab buttons
 local MainTab = Instance.new("TextButton")
 MainTab.Text = "Main"
 MainTab.Font = Enum.Font.GothamBold
@@ -250,7 +316,7 @@ ThemeTab.ZIndex = 12
 ThemeTab.AutoButtonColor = false
 ThemeTab.Parent = TabFrame
 
--- =========== SCROLLING FRAMES ===========
+-- Scrolling frames
 local MainScrollingFrame = Instance.new("ScrollingFrame")
 MainScrollingFrame.Size = UDim2.new(1, 0, 1, 0)
 MainScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 480)
@@ -318,7 +384,7 @@ local function createToggle(name, yPos, defaultState, callback)
 	toggleButton.Size = UDim2.new(0, 52, 0, 26)
 	toggleButton.Position = UDim2.new(1, -64, 0.5, -13)
 	toggleButton.Text = ""
-	toggleButton.BackgroundColor3 = defaultState and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(55, 55, 55)
+	toggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
 	toggleButton.BorderSizePixel = 0
 	toggleButton.ZIndex = 14
 	toggleButton.AutoButtonColor = false
@@ -326,13 +392,21 @@ local function createToggle(name, yPos, defaultState, callback)
 
 	local toggleDot = Instance.new("Frame")
 	toggleDot.Size = UDim2.new(0, 20, 0, 20)
-	toggleDot.Position = defaultState and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+	toggleDot.Position = UDim2.new(0, 3, 0.5, -10)
 	toggleDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	toggleDot.BorderSizePixel = 0
 	toggleDot.ZIndex = 15
 	toggleDot.Parent = toggleButton
 
-	local toggleState = defaultState
+	local toggleState = defaultState or false
+	
+	if toggleState then
+		toggleButton.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+		toggleDot.Position = UDim2.new(1, -23, 0.5, -10)
+	else
+		toggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+		toggleDot.Position = UDim2.new(0, 3, 0.5, -10)
+	end
 
 	toggleButton.MouseButton1Click:Connect(function()
 		toggleState = not toggleState
@@ -345,11 +419,13 @@ local function createToggle(name, yPos, defaultState, callback)
 			TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(55, 55, 55)}):Play()
 		end
 
-		if callback then callback(toggleState) end
+		if callback then 
+			callback(toggleState) 
+		end
 	end)
 
-	if callback and defaultState then
-		task.spawn(function() callback(defaultState) end)
+	if callback and toggleState then
+		task.spawn(function() callback(toggleState) end)
 	end
 
 	return toggleFrame
@@ -385,8 +461,9 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 	sliderBar.Active = true
 	sliderBar.Parent = sliderFrame
 
-	local sliderFill = Instance.new("Frame")
 	local ratio = (defaultVal - minVal) / (maxVal - minVal)
+	
+	local sliderFill = Instance.new("Frame")
 	sliderFill.Size = UDim2.new(ratio, 0, 1, 0)
 	sliderFill.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
 	sliderFill.BorderSizePixel = 0
@@ -410,6 +487,8 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 	local function updateSlider(input)
 		local barAbsPos = sliderBar.AbsolutePosition
 		local barAbsSize = sliderBar.AbsoluteSize
+		if not barAbsPos or not barAbsSize then return end
+		
 		local relativeX = (input.Position.X - barAbsPos.X) / barAbsSize.X
 		relativeX = math.clamp(relativeX, 0, 1)
 
@@ -438,31 +517,38 @@ local function createSlider(name, yPos, minVal, maxVal, defaultVal, callback)
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateSlider(input)
+		if isDragging then
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+				updateSlider(input)
+			end
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and isDragging then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			isDragging = false
 		end
 	end)
 
-	if callback then callback(defaultVal) end
+	if callback then 
+		callback(defaultVal) 
+	end
 
-	return {frame = sliderFrame, setValue = function(val) 
-		local r = (val - minVal) / (maxVal - minVal)
-		sliderFill.Size = UDim2.new(r, 0, 1, 0)
-		sliderButton.Position = UDim2.new(r, -10, 0.5, -10)
-		sliderLabel.Text = name .. " [" .. tostring(val) .. "]"
-		currentValue = val
-		if callback then callback(val) end
-	end}
+	return {
+		frame = sliderFrame, 
+		setValue = function(val) 
+			local r = (val - minVal) / (maxVal - minVal)
+			r = math.clamp(r, 0, 1)
+			sliderFill.Size = UDim2.new(r, 0, 1, 0)
+			sliderButton.Position = UDim2.new(r, -10, 0.5, -10)
+			sliderLabel.Text = name .. " [" .. tostring(val) .. "]"
+			currentValue = val
+			if callback then callback(val) end
+		end
+	}
 end
 
 -- =========== MAIN TAB CONTENT ===========
--- Auto Walk Toggle
 createToggle("Auto Walk", 10, savedAutoWalk, function(state)
 	autoWalkEnabled = state
 	saveValue("AutoWalk", state)
@@ -475,45 +561,53 @@ createToggle("Auto Walk", 10, savedAutoWalk, function(state)
 	if autoWalkEnabled then
 		autoWalkConnection = RunService.Heartbeat:Connect(function()
 			local char = player.Character
-			if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
-				local hum = char.Humanoid
-				local rootPart = char.HumanoidRootPart
-				if hum.MoveDirection.Magnitude < 0.1 then
-					local forwardDir = rootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
-					if forwardDir.Magnitude > 0.01 then
-						hum:Move(forwardDir.Unit, false)
-					else
-						hum:Move(Vector3.new(0, 0, -1), false)
-					end
+			if not char then return end
+			
+			local hum = char:FindFirstChild("Humanoid")
+			local rootPart = char:FindFirstChild("HumanoidRootPart")
+			if not hum or not rootPart then return end
+			
+			if hum.MoveDirection.Magnitude < 0.1 then
+				local forwardDir = rootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+				if forwardDir.Magnitude > 0.01 then
+					hum:Move(forwardDir.Unit, false)
+				else
+					hum:Move(Vector3.new(0, 0, -1), false)
 				end
 			end
 		end)
 	end
 end)
 
--- Walk Speed Slider
 local walkSpeedSlider = createSlider("Walk Speed", 75, 8, 100, savedWalkSpeed, function(value)
-	if player.Character and player.Character:FindFirstChild("Humanoid") then
-		player.Character.Humanoid.WalkSpeed = value
+	local char = player.Character
+	if char then
+		local hum = char:FindFirstChild("Humanoid")
+		if hum then
+			hum.WalkSpeed = value
+		end
 	end
 	saveValue("WalkSpeed", value)
 end)
 
--- Jump Power Slider
 local jumpPowerSlider = createSlider("Jump Power", 165, 10, 200, savedJumpPower, function(value)
-	if player.Character and player.Character:FindFirstChild("Humanoid") then
-		player.Character.Humanoid.JumpPower = value
+	local char = player.Character
+	if char then
+		local hum = char:FindFirstChild("Humanoid")
+		if hum then
+			hum.JumpPower = value
+		end
 	end
 	saveValue("JumpPower", value)
 end)
 
--- FOV Slider
 local fovSlider = createSlider("Field of View", 255, 30, 120, savedFOV, function(value)
-	camera.FieldOfView = value
+	if camera then
+		camera.FieldOfView = value
+	end
 	saveValue("FOV", value)
 end)
 
--- ESP Toggle
 createToggle("ESP Players", 345, savedESP, function(state)
 	espEnabled = state
 	saveValue("ESP", state)
@@ -552,7 +646,6 @@ ResetButton.MouseLeave:Connect(function()
 end)
 
 ResetButton.MouseButton1Click:Connect(function()
-	-- Reset all settings
 	walkSpeedSlider.setValue(16)
 	jumpPowerSlider.setValue(50)
 	fovSlider.setValue(70)
@@ -560,7 +653,6 @@ ResetButton.MouseButton1Click:Connect(function()
 	saveValue("JumpPower", 50)
 	saveValue("FOV", 70)
 	
-	-- Reset toggles (they'll be recreated next time, but values are saved)
 	saveValue("AutoWalk", false)
 	saveValue("ESP", false)
 	autoWalkEnabled = false
@@ -580,13 +672,15 @@ ResetButton.MouseButton1Click:Connect(function()
 	espBillboards = {}
 end)
 
--- =========== ESP SYSTEM (Name + Distance) ===========
+-- =========== ESP SYSTEM ===========
 RunService.Heartbeat:Connect(function()
 	if not espEnabled then return end
 	
 	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr == player or not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then
-			-- Clean up if exists
+		if plr == player then continue end
+		
+		local char = plr.Character
+		if not char then
 			if espHighlights[plr.UserId] then
 				espHighlights[plr.UserId]:Destroy()
 				espHighlights[plr.UserId] = nil
@@ -598,13 +692,14 @@ RunService.Heartbeat:Connect(function()
 			continue
 		end
 		
-		local char = plr.Character
-		local rootPart = char.HumanoidRootPart
+		local rootPart = char:FindFirstChild("HumanoidRootPart")
 		local head = char:FindFirstChild("Head")
+		if not rootPart then continue end
 		
-		-- Create or update highlight
-		if not espHighlights[plr.UserId] or espHighlights[plr.UserId].Parent ~= char then
-			if espHighlights[plr.UserId] then espHighlights[plr.UserId]:Destroy() end
+		-- Create/update highlight
+		local existingHL = espHighlights[plr.UserId]
+		if not existingHL or existingHL.Parent ~= char then
+			if existingHL then existingHL:Destroy() end
 			local highlight = Instance.new("Highlight")
 			highlight.FillColor = Color3.fromRGB(255, 60, 60)
 			highlight.FillTransparency = 0.4
@@ -616,10 +711,11 @@ RunService.Heartbeat:Connect(function()
 			espHighlights[plr.UserId] = highlight
 		end
 		
-		-- Create or update billboard
+		-- Create/update billboard
 		if head then
-			if not espBillboards[plr.UserId] or espBillboards[plr.UserId].Parent ~= head then
-				if espBillboards[plr.UserId] then espBillboards[plr.UserId]:Destroy() end
+			local existingBB = espBillboards[plr.UserId]
+			if not existingBB or existingBB.Parent ~= head then
+				if existingBB then existingBB:Destroy() end
 				
 				local billboard = Instance.new("BillboardGui")
 				billboard.Size = UDim2.new(0, 200, 0, 50)
@@ -635,7 +731,6 @@ RunService.Heartbeat:Connect(function()
 				frame.Parent = billboard
 				
 				local nameLabel = Instance.new("TextLabel")
-				nameLabel.Name = "Name"
 				nameLabel.Text = plr.Name
 				nameLabel.Font = Enum.Font.GothamBold
 				nameLabel.TextSize = 14
@@ -646,7 +741,6 @@ RunService.Heartbeat:Connect(function()
 				nameLabel.Parent = frame
 				
 				local distLabel = Instance.new("TextLabel")
-				distLabel.Name = "Distance"
 				distLabel.Text = "0m"
 				distLabel.Font = Enum.Font.Gotham
 				distLabel.TextSize = 12
@@ -661,16 +755,20 @@ RunService.Heartbeat:Connect(function()
 			end
 			
 			-- Update distance
-			if espBillboards[plr.UserId] then
-				local billboard = espBillboards[plr.UserId]
-				local distFrame = billboard:FindFirstChild("Frame")
+			local bb = espBillboards[plr.UserId]
+			if bb then
+				local distFrame = bb:FindFirstChild("Frame")
 				if distFrame then
 					local distLabel = distFrame:FindFirstChild("Distance")
-					if distLabel and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-						local myPos = player.Character.HumanoidRootPart.Position
-						local theirPos = rootPart.Position
-						local distance = (myPos - theirPos).Magnitude
-						distLabel.Text = string.format("%.1fm", distance)
+					if distLabel then
+						local myChar = player.Character
+						if myChar then
+							local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+							if myRoot then
+								local distance = (myRoot.Position - rootPart.Position).Magnitude
+								distLabel.Text = string.format("%.1fm", distance)
+							end
+						end
 					end
 				end
 			end
@@ -678,21 +776,26 @@ RunService.Heartbeat:Connect(function()
 	end
 	
 	-- Clean up disconnected players
+	local toRemove = {}
 	for userId, _ in pairs(espHighlights) do
-		if not Players:GetPlayerByUserId(userId) then
-			pcall(function() espHighlights[userId]:Destroy() end)
-			espHighlights[userId] = nil
+		local plr = Players:GetPlayerByUserId(userId)
+		if not plr then
+			table.insert(toRemove, userId)
 		end
 	end
-	for userId, _ in pairs(espBillboards) do
-		if not Players:GetPlayerByUserId(userId) then
-			pcall(function() espBillboards[userId]:Destroy() end)
+	for _, userId in ipairs(toRemove) do
+		if espHighlights[userId] then
+			espHighlights[userId]:Destroy()
+			espHighlights[userId] = nil
+		end
+		if espBillboards[userId] then
+			espBillboards[userId]:Destroy()
 			espBillboards[userId] = nil
 		end
 	end
 end)
 
--- =========== THEME TAB CONTENT ===========
+-- =========== THEME TAB ===========
 local ThemeLabel = Instance.new("TextLabel")
 ThemeLabel.Text = "Interface Theme"
 ThemeLabel.Font = Enum.Font.GothamBold
@@ -737,19 +840,18 @@ for i, theme in ipairs(themes) do
 	end)
 
 	themeButton.MouseButton1Click:Connect(function()
-		local tweenInfo = TweenInfo.new(0.3)
-		TweenService:Create(MainFrame, tweenInfo, {BackgroundColor3 = theme.dark}):Play()
-		TweenService:Create(TitleBar, tweenInfo, {BackgroundColor3 = Color3.fromRGB(
+		TweenService:Create(MainFrame, TweenInfo.new(0.3), {BackgroundColor3 = theme.dark}):Play()
+		TweenService:Create(TitleBar, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(
 			math.clamp(theme.dark.R * 255 + 10, 0, 255) / 255,
 			math.clamp(theme.dark.G * 255 + 10, 0, 255) / 255,
 			math.clamp(theme.dark.B * 255 + 10, 0, 255) / 255
 		)}):Play()
-		TweenService:Create(TabFrame, tweenInfo, {BackgroundColor3 = Color3.fromRGB(
+		TweenService:Create(TabFrame, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(
 			math.max(0, theme.dark.R * 255 - 8) / 255,
 			math.max(0, theme.dark.G * 255 - 8) / 255,
 			math.max(0, theme.dark.B * 255 - 8) / 255
 		)}):Play()
-		TweenService:Create(MainBorder, tweenInfo, {Color = theme.main}):Play()
+		TweenService:Create(MainBorder, TweenInfo.new(0.3), {Color = theme.main}):Play()
 		MainScrollingFrame.ScrollBarImageColor3 = theme.main
 		ThemeScrollingFrame.ScrollBarImageColor3 = theme.main
 	end)
@@ -792,7 +894,7 @@ CloseButton.MouseButton1Click:Connect(function()
 	ScreenGui:Destroy()
 end)
 
--- =========== BUTTON HOVER EFFECTS ===========
+-- =========== HOVER EFFECTS ===========
 local function addHoverEffect(button, defaultColor)
 	button.MouseEnter:Connect(function()
 		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(55, 55, 55)}):Play()
@@ -805,56 +907,29 @@ end
 addHoverEffect(MinimizeButton, Color3.fromRGB(40, 40, 40))
 addHoverEffect(CloseButton, Color3.fromRGB(40, 40, 40))
 
--- =========== CHARACTER RESPAWN HANDLER ===========
+-- =========== CHARACTER RESPAWN ===========
 player.CharacterAdded:Connect(function(newCharacter)
 	character = newCharacter
 	humanoid = newCharacter:WaitForChild("Humanoid")
 	camera = workspace.CurrentCamera
 	
-	-- Apply saved settings
-	humanoid.WalkSpeed = loadValue("WalkSpeed", 16)
-	humanoid.JumpPower = loadValue("JumpPower", 50)
-	camera.FieldOfView = loadValue("FOV", 70)
+	if humanoid then
+		humanoid.WalkSpeed = loadValue("WalkSpeed", 16)
+		humanoid.JumpPower = loadValue("JumpPower", 50)
+	end
+	if camera then
+		camera.FieldOfView = loadValue("FOV", 70)
+	end
 	
-	-- Restart auto walk if enabled
 	if autoWalkEnabled then
 		if autoWalkConnection then autoWalkConnection:Disconnect() end
 		autoWalkConnection = RunService.Heartbeat:Connect(function()
 			local char = player.Character
-			if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
-				local hum = char.Humanoid
-				local rootPart = char.HumanoidRootPart
-				if hum.MoveDirection.Magnitude < 0.1 then
-					local forwardDir = rootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
-					if forwardDir.Magnitude > 0.01 then
-						hum:Move(forwardDir.Unit, false)
-					else
-						hum:Move(Vector3.new(0, 0, -1), false)
-					end
-				end
-			end
-		end)
-	end
-	
-	-- Clear ESP highlights for old character
-	for userId, hl in pairs(espHighlights) do
-		if hl.Parent ~= Players:GetPlayerByUserId(userId)?.Character then
-			pcall(function() hl:Destroy() end)
-		end
-	end
-	for userId, bb in pairs(espBillboards) do
-		pcall(function() bb:Destroy() end)
-	end
-	espBillboards = {}
-end)
-
--- =========== INITIAL AUTO WALK (if saved) ===========
-if savedAutoWalk then
-	autoWalkConnection = RunService.Heartbeat:Connect(function()
-		local char = player.Character
-		if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
-			local hum = char.Humanoid
-			local rootPart = char.HumanoidRootPart
+			if not char then return end
+			local hum = char:FindFirstChild("Humanoid")
+			local rootPart = char:FindFirstChild("HumanoidRootPart")
+			if not hum or not rootPart then return end
+			
 			if hum.MoveDirection.Magnitude < 0.1 then
 				local forwardDir = rootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
 				if forwardDir.Magnitude > 0.01 then
@@ -863,6 +938,41 @@ if savedAutoWalk then
 					hum:Move(Vector3.new(0, 0, -1), false)
 				end
 			end
+		end)
+	end
+	
+	-- Clean up old ESP references
+	for userId, hl in pairs(espHighlights) do
+		local targetPlayer = Players:GetPlayerByUserId(userId)
+		if not targetPlayer or hl.Parent ~= targetPlayer.Character then
+			pcall(function() hl:Destroy() end)
+			espHighlights[userId] = nil
+		end
+	end
+	for userId, bb in pairs(espBillboards) do
+		pcall(function() bb:Destroy() end)
+		espBillboards[userId] = nil
+	end
+end)
+
+-- =========== INITIAL AUTO WALK ===========
+if savedAutoWalk then
+	autoWalkConnection = RunService.Heartbeat:Connect(function()
+		local char = player.Character
+		if not char then return end
+		local hum = char:FindFirstChild("Humanoid")
+		local rootPart = char:FindFirstChild("HumanoidRootPart")
+		if not hum or not rootPart then return end
+		
+		if hum.MoveDirection.Magnitude < 0.1 then
+			local forwardDir = rootPart.CFrame.LookVector * Vector3.new(1, 0, 1)
+			if forwardDir.Magnitude > 0.01 then
+				hum:Move(forwardDir.Unit, false)
+			else
+				hum:Move(Vector3.new(0, 0, -1), false)
+			end
 		end
 	end)
 end
+
+print("✅ Synapse UI v4 loaded successfully!")
