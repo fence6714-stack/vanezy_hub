@@ -109,7 +109,7 @@ applySettings()
 
 -- =========== РЕКЛАМНАЯ ПАНЕЛЬ (5 сек) ===========
 local AdFrame = Instance.new("Frame")
-AdFrame.Size = UDim2.new(0, 320, 0, 200)
+AdFrame.Size = UDim2.new(0, 300, 0, 200)
 AdFrame.Position = UDim2.new(0.5, -160, 0.5, -100)
 AdFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 AdFrame.BackgroundTransparency = 1
@@ -296,8 +296,8 @@ byFadeIn:Play()
 
 -- =========== ОСНОВНОЕ МЕНЮ ===========
 local MainContainer = Instance.new("Frame")
-MainContainer.Size = UDim2.new(0, 520, 0, 460)
-MainContainer.Position = UDim2.new(0.5, -260, 0.5, -230)
+MainContainer.Size = UDim2.new(0, 450, 0, 350)
+MainContainer.Position = UDim2.new(0.5, -225, 0.5, -175)
 MainContainer.BackgroundTransparency = 1
 MainContainer.ZIndex = 10
 MainContainer.Visible = false
