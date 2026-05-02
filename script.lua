@@ -1,9 +1,9 @@
 --[[
-	SYNAPSE HUB v16 - FLOATING ICON + IMPROVED NOTIFICATIONS
+	SYNAPSE HUB v17 - FULLY WORKING WITH CUSTOM ICON
 	by Vanezy Scripts
 ]]
 
-print("START - Synapse Hub v16")
+print("START - Synapse Hub v17")
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -19,7 +19,7 @@ end
 -- =========== CLIPBOARD ===========
 local Clipboard = setclipboard or toclipboard or function() end
 
--- =========== НАСТРОЙКИ ===========
+-- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ===========
 local DEFAULT_SETTINGS = {
 	walkSpeed = 16,
 	jumpPower = 50,
@@ -94,26 +94,17 @@ if not ScreenGui.Parent then
 	ScreenGui.Parent = playerGui
 end
 
--- =========== ПЛАВАЮЩАЯ ИКОНКА ===========
-local function updateFloatingButtonPosition()
-	if floatingButton then
-		floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
-	end
-end
-
+-- =========== ПЛАВАЮЩАЯ ИКОНКА (СТАРАЯ ВСЕГДА ВИДНА) ===========
 local function createFloatingButton()
 	if floatingButton then
 		floatingButton:Destroy()
 		floatingButton = nil
 	end
 	
-	floatingButton = Instance.new("TextButton")
+	floatingButton = Instance.new("ImageButton")
 	floatingButton.Size = UDim2.new(0, 55, 0, 55)
 	floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
-	floatingButton.Text = "✨"
-	floatingButton.Font = Enum.Font.GothamBold
-	floatingButton.TextSize = 28
-	floatingButton.TextColor3 = Color3.fromRGB(0, 160, 255)
+	floatingButton.Image = "https://i.imgur.com/0Q8S76V.jpeg"
 	floatingButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	floatingButton.BackgroundTransparency = 0.1
 	floatingButton.BorderSizePixel = 0
@@ -129,7 +120,6 @@ local function createFloatingButton()
 	btnStroke.Thickness = 2
 	btnStroke.Parent = floatingButton
 	
-	-- Drag для плавающей иконки
 	local btnDragging = false
 	local btnDragStart, btnStartPos
 	
@@ -158,7 +148,6 @@ local function createFloatingButton()
 		end
 	end)
 	
-	-- Клик для открытия/закрытия
 	floatingButton.MouseButton1Click:Connect(function()
 		if isMinimized then
 			restoreMenu()
@@ -170,7 +159,7 @@ local function createFloatingButton()
 	return floatingButton
 end
 
--- =========== УВЕДОМЛЕНИЯ (СПРАВА СВЕРХУ, ВЫШЕ И ПРАВЕЕ) ===========
+-- =========== УВЕДОМЛЕНИЯ ===========
 local activeNotifications = {}
 local notificationContainer = nil
 
@@ -200,7 +189,7 @@ local function createNotification(text, duration)
 	notifCorner.Parent = notification
 	
 	local notifStroke = Instance.new("UIStroke")
-	notifStroke.Color = mainStroke and mainStroke.Color or Color3.fromRGB(0, 140, 255)
+	notifStroke.Color = Color3.fromRGB(0, 140, 255)
 	notifStroke.Thickness = 1
 	notifStroke.Parent = notification
 	
@@ -239,7 +228,6 @@ local function createNotification(text, duration)
 	fillCorner.CornerRadius = UDim.new(1, 0)
 	fillCorner.Parent = progressFill
 	
-	-- Анимация появления
 	notification.BackgroundTransparency = 1
 	notification.Size = UDim2.new(1, 0, 0, 0)
 	
@@ -249,7 +237,6 @@ local function createNotification(text, duration)
 	})
 	appearTween:Play()
 	
-	-- Сдвигаем существующие уведомления вниз
 	for i, notif in ipairs(activeNotifications) do
 		local newY = (i) * 60
 		TweenService:Create(notif.frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
@@ -267,13 +254,11 @@ local function createNotification(text, duration)
 	
 	notification.Position = UDim2.new(0, 0, 0, 0)
 	
-	-- Анимация ползунка (уменьшается)
 	local progressTween = TweenService:Create(progressFill, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
 		Size = UDim2.new(0, 0, 1, 0)
 	})
 	progressTween:Play()
 	
-	-- Удаление через время
 	task.spawn(function()
 		task.wait(duration)
 		
@@ -290,7 +275,6 @@ local function createNotification(text, duration)
 					notification:Destroy()
 				end)
 				
-				-- Сдвигаем оставшиеся уведомления вверх
 				for j, remaining in ipairs(activeNotifications) do
 					local newY = (j - 1) * 60
 					TweenService:Create(remaining.frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
@@ -481,7 +465,7 @@ MainFrame.Position = UDim2.new(0.5, -settings.windowWidth/2, 0.5, -settings.wind
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
 MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
-MainFrame.Visible = false
+MainFrame.Visible = true
 MainFrame.Parent = ScreenGui
 
 local mainCorner = Instance.new("UICorner")
@@ -564,7 +548,6 @@ local function createResizeZone(cursor, position, size)
 	return zone
 end
 
--- Создаём зоны для ресайза
 local bottomRight = createResizeZone("bottomRight", UDim2.new(1, -12, 1, -12), 20)
 local bottomLeft = createResizeZone("bottomLeft", UDim2.new(0, -8, 1, -12), 20)
 local topRight = createResizeZone("topRight", UDim2.new(1, -12, 0, -8), 20)
@@ -583,7 +566,6 @@ for _, zone in pairs({bottomRight, bottomLeft, topRight, topLeft}) do
 	markerCorner.Parent = marker
 end
 
--- Заголовок
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -617,7 +599,6 @@ ByLabel.Position = UDim2.new(0, 12, 0, 24)
 ByLabel.TextXAlignment = Enum.TextXAlignment.Left
 ByLabel.Parent = TitleBar
 
--- Кнопка закрытия (крестик)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -38, 0, 5)
@@ -633,7 +614,6 @@ local closeBtnCorner = Instance.new("UICorner")
 closeBtnCorner.CornerRadius = UDim.new(0, 8)
 closeBtnCorner.Parent = CloseBtn
 
--- Drag System для окна
 local dragging = false
 local dragStart, startPos
 
@@ -658,12 +638,11 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- =========== ФУНКЦИИ СВОРАЧИВАНИЯ/ВОССТАНОВЛЕНИЯ ===========
+-- =========== ФУНКЦИИ СВОРАЧИВАНИЯ/РАЗВОРАЧИВАНИЯ ===========
 local function minimizeMenu()
 	if isMinimized then return end
 	isMinimized = true
 	
-	-- Прячем главное меню
 	local hideTween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
 		BackgroundTransparency = 1,
 		Size = UDim2.new(0, 0, 0, 0)
@@ -673,16 +652,14 @@ local function minimizeMenu()
 		MainFrame.Visible = false
 	end)
 	
-	-- Показываем иконку (если её нет)
-	if not floatingButton then
-		createFloatingButton()
-	else
-		floatingButton.Visible = true
-		local btnAppear = TweenService:Create(floatingButton, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-			BackgroundTransparency = 0.1,
-			Size = UDim2.new(0, 55, 0, 55)
+	if floatingButton then
+		local btnPulse = TweenService:Create(floatingButton, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+			Size = UDim2.new(0, 60, 0, 60)
 		})
-		btnAppear:Play()
+		btnPulse:Play()
+		btnPulse.Completed:Connect(function()
+			TweenService:Create(floatingButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 55, 0, 55)}):Play()
+		end)
 	end
 end
 
@@ -690,30 +667,27 @@ local function restoreMenu()
 	if not isMinimized then return end
 	isMinimized = false
 	
-	-- Прячем иконку
-	if floatingButton then
-		local btnHide = TweenService:Create(floatingButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-			BackgroundTransparency = 1,
-			Size = UDim2.new(0, 0, 0, 0)
-		})
-		btnHide:Play()
-		btnHide.Completed:Connect(function()
-			floatingButton.Visible = false
-		end)
-	end
-	
-	-- Показываем главное меню
 	MainFrame.Visible = true
-	MainFrame.Size = UDim2.new(0, settings.windowWidth, 0, settings.windowHeight)
-	MainFrame.BackgroundTransparency = 0.05
+	MainFrame.Size = UDim2.new(0, 0, 0, 0)
+	MainFrame.BackgroundTransparency = 1
+	
 	local showTween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
 		BackgroundTransparency = 0.05,
 		Size = UDim2.new(0, settings.windowWidth, 0, settings.windowHeight)
 	})
 	showTween:Play()
+	
+	if floatingButton then
+		local btnPulse = TweenService:Create(floatingButton, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+			Size = UDim2.new(0, 60, 0, 60)
+		})
+		btnPulse:Play()
+		btnPulse.Completed:Connect(function()
+			TweenService:Create(floatingButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 55, 0, 55)}):Play()
+		end)
+	end
 end
 
--- Кнопка закрытия (полное закрытие)
 CloseBtn.MouseButton1Click:Connect(function()
 	if floatingButton then
 		floatingButton:Destroy()
@@ -1134,7 +1108,6 @@ local rainbowToggle = createToggle(Content, "Rainbow Mode", yOffset, settings.ra
 			mainStroke.Color = col
 			TitleText.TextColor3 = col
 			if floatingButton then
-				floatingButton.TextColor3 = col
 				local stroke = floatingButton:FindFirstChild("UIStroke")
 				if stroke then stroke.Color = col end
 			end
@@ -1143,7 +1116,6 @@ local rainbowToggle = createToggle(Content, "Rainbow Mode", yOffset, settings.ra
 end)
 yOffset = yOffset + 50
 
--- Кнопки
 local SaveBtn = Instance.new("TextButton")
 SaveBtn.Size = UDim2.new(0.45, -15, 0, 35)
 SaveBtn.Position = UDim2.new(0.03, 0, 0, yOffset)
@@ -1267,7 +1239,7 @@ if settings.noclip then
 	end)
 end
 
--- =========== ESP (С ПОЛНОЙ ОЧИСТКОЙ) ===========
+-- =========== ESP ===========
 function updateESP()
 	if espConnection then
 		espConnection:Disconnect()
@@ -1520,14 +1492,12 @@ end
 -- =========== ЗАПУСК ===========
 task.wait(5.5)
 
--- Создаём плавающую иконку (всегда видна)
 createFloatingButton()
 floatingButton.Visible = true
 floatingButton.Position = UDim2.new(0, 10, 0.5, -27)
 settings.floatingX = 10
 settings.floatingY = math.floor(floatingButton.Position.Y.Offset)
 
--- Показываем главное меню (открыто при старте)
 isMinimized = false
 MainFrame.Visible = true
 MainFrame.Size = UDim2.new(0, settings.windowWidth, 0, settings.windowHeight)
@@ -1535,4 +1505,7 @@ MainFrame.BackgroundTransparency = 0.05
 local menuAppear = TweenService:Create(MainFrame, TweenInfo.new(0.4), {BackgroundTransparency = 0.05})
 menuAppear:Play()
 
-createNotification("✨ Script Loaded! Click the icon to minimize/open", 3)
+createNotification("✨ Script Loaded! Click icon to minimize/open", 3)
+
+print("✅ Synapse Hub v17 loaded!")
+print("📢 Telegram: @VanezyScripts")
