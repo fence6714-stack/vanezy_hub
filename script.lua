@@ -1,111 +1,127 @@
--- Vanezy Universal ESP (Max Compatible)
+-- Vanezy GUI + AutoWalk
 
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
-local ESPEnabled = true
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 -- GUI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "VanezyESP"
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "VanezyMenu"
 
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 220, 0, 120)
-Frame.Position = UDim2.new(0.05, 0, 0.3, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 250, 0, 150)
+frame.Position = UDim2.new(0.1, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 
-local Title = Instance.new("TextLabel", Frame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "Vanezy Script Universal Esp"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.TextScaled = true
+-- Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundTransparency = 1
+title.Text = "Vanezy Script"
+title.TextColor3 = Color3.new(1,1,1)
 
-local Toggle = Instance.new("TextButton", Frame)
-Toggle.Size = UDim2.new(0, 160, 0, 40)
-Toggle.Position = UDim2.new(0.5, -80, 0.6, 0)
-Toggle.Text = "ON"
-Toggle.BackgroundColor3 = Color3.fromRGB(0,200,0)
-Toggle.TextScaled = true
+-- Close
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0,30,0,30)
+close.Position = UDim2.new(1,-30,0,0)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(200,0,0)
 
--- Найти любую часть персонажа (если нет Head)
-local function getPart(char)
-    return char:FindFirstChild("Head")
-        or char:FindFirstChild("HumanoidRootPart")
-        or char:FindFirstChildWhichIsA("BasePart")
-end
+-- Minimize
+local minimize = Instance.new("TextButton", frame)
+minimize.Size = UDim2.new(0,30,0,30)
+minimize.Position = UDim2.new(1,-60,0,0)
+minimize.Text = "-"
+minimize.BackgroundColor3 = Color3.fromRGB(100,100,100)
 
--- ESP
-local function addESP(char, player)
-    if not ESPEnabled then return end
-    if not char or not char.Parent then return end
+-- AutoWalk button
+local walkBtn = Instance.new("TextButton", frame)
+walkBtn.Size = UDim2.new(0,200,0,40)
+walkBtn.Position = UDim2.new(0.5,-100,0.5,0)
+walkBtn.Text = "AutoWalk OFF"
+walkBtn.BackgroundColor3 = Color3.fromRGB(255,0,0)
 
-    local part = getPart(char)
-    if not part then return end
+-- DRAG (мобилка + ПК)
+local dragging, dragInput, dragStart, startPos
 
-    -- Highlight (если не удаляется игрой)
-    if not char:FindFirstChild("ESP") then
-        local h = Instance.new("Highlight")
-        h.Name = "ESP"
-        h.FillColor = Color3.fromRGB(0,255,0)
-        h.OutlineColor = Color3.new(1,1,1)
-        h.FillTransparency = 0.5
-        pcall(function()
-            h.Parent = char
-        end)
-    end
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
 
-    -- Ник
-    if not part:FindFirstChild("ESP_NAME") then
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "ESP_NAME"
-        billboard.Size = UDim2.new(0, 100, 0, 40)
-        billboard.AlwaysOnTop = true
-        billboard.Parent = part
-
-        local text = Instance.new("TextLabel", billboard)
-        text.Size = UDim2.new(1,0,1,0)
-        text.BackgroundTransparency = 1
-        text.Text = player.Name
-        text.TextColor3 = Color3.new(1,1,1)
-        text.TextStrokeTransparency = 0
-    end
-end
-
-local function removeESP(char)
-    if char:FindFirstChild("ESP") then
-        char.ESP:Destroy()
-    end
-    for _, v in pairs(char:GetDescendants()) do
-        if v.Name == "ESP_NAME" then
-            v:Destroy()
-        end
-    end
-end
-
--- Постоянное обновление (если игра удаляет ESP — вернёт обратно)
-RunService.RenderStepped:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            if ESPEnabled then
-                addESP(player.Character, player)
-            else
-                removeESP(player.Character)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
             end
-        end
+        end)
     end
 end)
 
--- Кнопка
-Toggle.MouseButton1Click:Connect(function()
-    ESPEnabled = not ESPEnabled
-
-    if ESPEnabled then
-        Toggle.Text = "ON"
-        Toggle.BackgroundColor3 = Color3.fromRGB(0,200,0)
-    else
-        Toggle.Text = "OFF"
-        Toggle.BackgroundColor3 = Color3.fromRGB(255,0,0)
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
     end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Close
+close.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Minimize
+local minimized = false
+minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+
+    if minimized then
+        frame.Size = UDim2.new(0,250,0,30)
+        walkBtn.Visible = false
+    else
+        frame.Size = UDim2.new(0,250,0,150)
+        walkBtn.Visible = true
+    end
+end)
+
+-- AutoWalk
+local walking = false
+
+walkBtn.MouseButton1Click:Connect(function()
+    walking = not walking
+
+    if walking then
+        walkBtn.Text = "AutoWalk ON"
+        walkBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
+    else
+        walkBtn.Text = "AutoWalk OFF"
+        walkBtn.BackgroundColor3 = Color3.fromRGB(255,0,0)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if walking and Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid:Move(Vector3.new(0,0,-1), true)
+    end
+end)
+
+-- Обновление персонажа после смерти
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
 end)
