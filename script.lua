@@ -453,17 +453,21 @@ local function toggleKillLoop()
 	end
 end
 
--- =========== ПЛАВАЮЩАЯ ИКОНКА ===========
+-- =========== ПЛАВАЮЩАЯ ИКОНКА (СМАЙЛИК) ===========
 local function createFloatingButton()
 	if floatingButton then
 		floatingButton:Destroy()
 		floatingButton = nil
 	end
 	
-	floatingButton = Instance.new("ImageButton")
+	-- Используем TextButton вместо ImageButton (надёжнее)
+	floatingButton = Instance.new("TextButton")
 	floatingButton.Size = UDim2.new(0, 55, 0, 55)
 	floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
-	floatingButton.Image = "https://i.imgur.com/0Q8S76V.jpeg"
+	floatingButton.Text = "⚜️"
+	floatingButton.TextScaled = true
+	floatingButton.Font = Enum.Font.GothamBold
+	floatingButton.TextColor3 = Color3.fromRGB(0, 160, 255)
 	floatingButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	floatingButton.BackgroundTransparency = 0.1
 	floatingButton.BorderSizePixel = 0
@@ -515,11 +519,11 @@ local function createFloatingButton()
 		end
 	end)
 	
-	-- Админ-индикатор
+	-- Админ-индикатор (красная точка)
 	if isAdmin then
 		local adminDot = Instance.new("Frame")
 		adminDot.Size = UDim2.new(0, 12, 0, 12)
-		adminDot.Position = UDim2.new(1, -10, 0, -2)
+		adminDot.Position = UDim2.new(1, -8, 0, -2)
 		adminDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 		adminDot.BorderSizePixel = 0
 		adminDot.ZIndex = 501
