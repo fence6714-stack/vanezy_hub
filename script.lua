@@ -1,9 +1,9 @@
 --[[
-	SYNAPSE HUB v18 - WITH TABS & FIXED ICON
+	SYNAPSE HUB v19 - FULLY WORKING WITH CUSTOM ICON
 	by Vanezy Scripts
 ]]
 
-print("START - Synapse Hub v18")
+print("START - Synapse Hub v19")
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -19,7 +19,7 @@ end
 -- =========== CLIPBOARD ===========
 local Clipboard = setclipboard or toclipboard or function() end
 
--- =========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ===========
+-- =========== НАСТРОЙКИ ===========
 local DEFAULT_SETTINGS = {
 	walkSpeed = 16,
 	jumpPower = 50,
@@ -601,14 +601,15 @@ ByLabel.Position = UDim2.new(0, 12, 0, 24)
 ByLabel.TextXAlignment = Enum.TextXAlignment.Left
 ByLabel.Parent = TitleBar
 
+-- КНОПКА СВОРАЧИВАНИЯ (МИНУС) - КРАСИВАЯ
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 MinimizeBtn.Position = UDim2.new(1, -70, 0, 5)
 MinimizeBtn.Text = "−"
 MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 20
-MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+MinimizeBtn.TextSize = 22
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 210, 0)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 MinimizeBtn.BorderSizePixel = 0
 MinimizeBtn.Parent = TitleBar
 
@@ -616,20 +617,38 @@ local minBtnCorner = Instance.new("UICorner")
 minBtnCorner.CornerRadius = UDim.new(0, 8)
 minBtnCorner.Parent = MinimizeBtn
 
+-- КНОПКА ЗАКРЫТИЯ (КРАСИВЫЙ КРЕСТИК)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -36, 0, 5)
 CloseBtn.Text = "✕"
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.TextSize = 18
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = TitleBar
 
 local closeBtnCorner = Instance.new("UICorner")
 closeBtnCorner.CornerRadius = UDim.new(0, 8)
 closeBtnCorner.Parent = CloseBtn
+
+-- Hover эффекты
+MinimizeBtn.MouseEnter:Connect(function()
+	TweenService:Create(MinimizeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 60, 75)}):Play()
+end)
+MinimizeBtn.MouseLeave:Connect(function()
+	TweenService:Create(MinimizeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 55)}):Play()
+end)
+
+CloseBtn.MouseEnter:Connect(function()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(200, 50, 50)}):Play()
+	CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+CloseBtn.MouseLeave:Connect(function()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 55)}):Play()
+	CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+end)
 
 MinimizeBtn.MouseButton1Click:Connect(function()
 	minimizeMenu()
@@ -645,6 +664,7 @@ CloseBtn.MouseButton1Click:Connect(function()
 	ScreenGui:Destroy()
 end)
 
+-- Drag для окна
 local dragging = false
 local dragStart, startPos
 
@@ -695,6 +715,7 @@ HomeTab.Position = UDim2.new(0, 5, 0, 10)
 HomeTab.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 HomeTab.TextColor3 = Color3.fromRGB(0, 160, 255)
 HomeTab.BorderSizePixel = 0
+HomeTab.AutoButtonColor = false
 HomeTab.Parent = TabFrame
 
 local homeCorner = Instance.new("UICorner")
@@ -702,7 +723,7 @@ homeCorner.CornerRadius = UDim.new(0, 6)
 homeCorner.Parent = HomeTab
 
 local MovementTab = Instance.new("TextButton")
-MovementTab.Text = "🏃 MOVEMENT"
+MovementTab.Text = "🏃 MOVE"
 MovementTab.Font = Enum.Font.GothamBold
 MovementTab.TextSize = 11
 MovementTab.Size = UDim2.new(1, -10, 0, 35)
@@ -710,6 +731,7 @@ MovementTab.Position = UDim2.new(0, 5, 0, 55)
 MovementTab.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MovementTab.TextColor3 = Color3.fromRGB(150, 150, 170)
 MovementTab.BorderSizePixel = 0
+MovementTab.AutoButtonColor = false
 MovementTab.Parent = TabFrame
 
 local moveCorner = Instance.new("UICorner")
@@ -725,6 +747,7 @@ CombatTab.Position = UDim2.new(0, 5, 0, 100)
 CombatTab.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 CombatTab.TextColor3 = Color3.fromRGB(150, 150, 170)
 CombatTab.BorderSizePixel = 0
+CombatTab.AutoButtonColor = false
 CombatTab.Parent = TabFrame
 
 local combatCorner = Instance.new("UICorner")
@@ -734,12 +757,12 @@ combatCorner.Parent = CombatTab
 local ESPTab = Instance.new("TextButton")
 ESPTab.Text = "👁️ ESP"
 ESPTab.Font = Enum.Font.GothamBold
-ESPTab.TextSize = 11
-ESPTab.Size = UDim2.new(1, -10, 0, 35)
+ESPTab.TextSize = 11ESPTab.Size = UDim2.new(1, -10, 0, 35)
 ESPTab.Position = UDim2.new(0, 5, 0, 145)
 ESPTab.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 ESPTab.TextColor3 = Color3.fromRGB(150, 150, 170)
 ESPTab.BorderSizePixel = 0
+ESPTab.AutoButtonColor = false
 ESPTab.Parent = TabFrame
 
 local espCorner = Instance.new("UICorner")
@@ -755,11 +778,32 @@ VisualTab.Position = UDim2.new(0, 5, 0, 190)
 VisualTab.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 VisualTab.TextColor3 = Color3.fromRGB(150, 150, 170)
 VisualTab.BorderSizePixel = 0
+VisualTab.AutoButtonColor = false
 VisualTab.Parent = TabFrame
 
 local visualCorner = Instance.new("UICorner")
 visualCorner.CornerRadius = UDim.new(0, 6)
 visualCorner.Parent = VisualTab
+
+-- Hover эффекты для вкладок
+local function addTabHover(btn, defaultColor)
+	btn.MouseEnter:Connect(function()
+		if btn.BackgroundColor3 ~= Color3.fromRGB(35, 35, 45) then
+			TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(30, 30, 40)}):Play()
+		end
+	end)
+	btn.MouseLeave:Connect(function()
+		if btn.BackgroundColor3 ~= Color3.fromRGB(35, 35, 45) then
+			TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = defaultColor}):Play()
+		end
+	end)
+end
+
+addTabHover(HomeTab, Color3.fromRGB(25, 25, 35))
+addTabHover(MovementTab, Color3.fromRGB(25, 25, 35))
+addTabHover(CombatTab, Color3.fromRGB(25, 25, 35))
+addTabHover(ESPTab, Color3.fromRGB(25, 25, 35))
+addTabHover(VisualTab, Color3.fromRGB(25, 25, 35))
 
 -- Контейнеры для каждой вкладки
 local HomeContainer = Instance.new("ScrollingFrame")
@@ -771,13 +815,13 @@ HomeContainer.BackgroundTransparency = 1
 HomeContainer.Parent = ContentContainer
 
 local HomeContent = Instance.new("Frame")
-HomeContent.Size = UDim2.new(1, 0, 0, 200)
+HomeContent.Size = UDim2.new(1, 0, 0, 220)
 HomeContent.BackgroundTransparency = 1
 HomeContent.Parent = HomeContainer
 
 local MovementContainer = Instance.new("ScrollingFrame")
 MovementContainer.Size = UDim2.new(1, 0, 1, 0)
-MovementContainer.CanvasSize = UDim2.new(0, 0, 0, 250)
+MovementContainer.CanvasSize = UDim2.new(0, 0, 0, 350)
 MovementContainer.ScrollBarThickness = 4
 MovementContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 MovementContainer.BackgroundTransparency = 1
@@ -785,13 +829,13 @@ MovementContainer.Visible = false
 MovementContainer.Parent = ContentContainer
 
 local MovementContent = Instance.new("Frame")
-MovementContent.Size = UDim2.new(1, 0, 0, 250)
+MovementContent.Size = UDim2.new(1, 0, 0, 370)
 MovementContent.BackgroundTransparency = 1
 MovementContent.Parent = MovementContainer
 
 local CombatContainer = Instance.new("ScrollingFrame")
 CombatContainer.Size = UDim2.new(1, 0, 1, 0)
-CombatContainer.CanvasSize = UDim2.new(0, 0, 0, 180)
+CombatContainer.CanvasSize = UDim2.new(0, 0, 0, 220)
 CombatContainer.ScrollBarThickness = 4
 CombatContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 CombatContainer.BackgroundTransparency = 1
@@ -799,13 +843,13 @@ CombatContainer.Visible = false
 CombatContainer.Parent = ContentContainer
 
 local CombatContent = Instance.new("Frame")
-CombatContent.Size = UDim2.new(1, 0, 0, 180)
+CombatContent.Size = UDim2.new(1, 0, 0, 240)
 CombatContent.BackgroundTransparency = 1
 CombatContent.Parent = CombatContainer
 
 local ESPContainer = Instance.new("ScrollingFrame")
 ESPContainer.Size = UDim2.new(1, 0, 1, 0)
-ESPContainer.CanvasSize = UDim2.new(0, 0, 0, 280)
+ESPContainer.CanvasSize = UDim2.new(0, 0, 0, 320)
 ESPContainer.ScrollBarThickness = 4
 ESPContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 ESPContainer.BackgroundTransparency = 1
@@ -813,13 +857,13 @@ ESPContainer.Visible = false
 ESPContainer.Parent = ContentContainer
 
 local ESPContent = Instance.new("Frame")
-ESPContent.Size = UDim2.new(1, 0, 0, 280)
+ESPContent.Size = UDim2.new(1, 0, 0, 340)
 ESPContent.BackgroundTransparency = 1
 ESPContent.Parent = ESPContainer
 
 local VisualContainer = Instance.new("ScrollingFrame")
 VisualContainer.Size = UDim2.new(1, 0, 1, 0)
-VisualContainer.CanvasSize = UDim2.new(0, 0, 0, 120)
+VisualContainer.CanvasSize = UDim2.new(0, 0, 0, 160)
 VisualContainer.ScrollBarThickness = 4
 VisualContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 VisualContainer.BackgroundTransparency = 1
@@ -827,7 +871,7 @@ VisualContainer.Visible = false
 VisualContainer.Parent = ContentContainer
 
 local VisualContent = Instance.new("Frame")
-VisualContent.Size = UDim2.new(1, 0, 0, 120)
+VisualContent.Size = UDim2.new(1, 0, 0, 180)
 VisualContent.BackgroundTransparency = 1
 VisualContent.Parent = VisualContainer
 
@@ -1044,7 +1088,7 @@ createSection(HomeContent, "📌 INFORMATION", homeY)
 homeY = homeY + 35
 
 local infoText = Instance.new("TextLabel")
-infoText.Text = "SYNAPSE HUB v18\nby Vanezy Scripts"
+infoText.Text = "SYNAPSE HUB v19\nby Vanezy Scripts"
 infoText.Font = Enum.Font.GothamBold
 infoText.TextSize = 14
 infoText.TextColor3 = Color3.fromRGB(0, 160, 255)
@@ -1146,6 +1190,8 @@ ResetBtn.MouseButton1Click:Connect(function()
 end)
 
 homeY = homeY + 55
+HomeContent.Size = UDim2.new(1, 0, 0, homeY + 20)
+HomeContainer.CanvasSize = UDim2.new(0, 0, 0, homeY + 30)
 
 -- =========== MOVEMENT ВКЛАДКА ===========
 local moveY = 10
@@ -1225,6 +1271,9 @@ local flySpeedSlider = createSlider(MovementContent, "Fly Speed", moveY, 30, 200
 end)
 moveY = moveY + 65
 
+MovementContent.Size = UDim2.new(1, 0, 0, moveY + 20)
+MovementContainer.CanvasSize = UDim2.new(0, 0, 0, moveY + 30)
+
 -- =========== COMBAT ВКЛАДКА ===========
 local combatY = 10
 createSection(CombatContent, "⚔️ COMBAT", combatY)
@@ -1268,6 +1317,9 @@ local infiniteJumpToggle = createToggle(CombatContent, "Infinite Jump", combatY,
 	saveValue("infiniteJump", v)
 end)
 combatY = combatY + 55
+
+CombatContent.Size = UDim2.new(1, 0, 0, combatY + 20)
+CombatContainer.CanvasSize = UDim2.new(0, 0, 0, combatY + 30)
 
 -- =========== ESP ВКЛАДКА ===========
 local espY = 10
@@ -1314,6 +1366,9 @@ local espDistanceToggle = createToggle(ESPContent, "ESP Distance", espY, setting
 end)
 espY = espY + 55
 
+ESPContent.Size = UDim2.new(1, 0, 0, espY + 20)
+ESPContainer.CanvasSize = UDim2.new(0, 0, 0, espY + 30)
+
 -- =========== VISUAL ВКЛАДКА ===========
 local visualY = 10
 createSection(VisualContent, "🎨 VISUAL", visualY)
@@ -1346,6 +1401,9 @@ local rainbowToggle = createToggle(VisualContent, "Rainbow Mode", visualY, setti
 	end
 end)
 visualY = visualY + 55
+
+VisualContent.Size = UDim2.new(1, 0, 0, visualY + 20)
+VisualContainer.CanvasSize = UDim2.new(0, 0, 0, visualY + 30)
 
 -- =========== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ===========
 local function switchTab(tab)
@@ -1676,7 +1734,7 @@ local menuAppear = TweenService:Create(MainFrame, TweenInfo.new(0.4), {Backgroun
 menuAppear:Play()
 
 switchTab("HOME")
-createNotification("✨ Script Loaded! Click icon to minimize", 3)
+createNotification("✨ Script Loaded! Click icon or '−' to minimize", 3)
 
-print("✅ Synapse Hub v18 loaded!")
+print("✅ Synapse Hub v19 loaded!")
 print("📢 Telegram: @VanezyScripts")
