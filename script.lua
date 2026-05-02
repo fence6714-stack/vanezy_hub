@@ -1,1048 +1,1009 @@
 --[[
-    BLOX FRUITS ULTIMATE FIXED v3.0
-    - Исправлен лаг (оптимизирован код)
-    - Авто-детект уровня, квестов, NPC, мобов
-    - Плавный полёт НАД мобами (безопасная высота)
-    - Притягивание мобов + убийство с воздуха
-    - Анти-падение, только плавное движение
-]]
+  Vanezy Universal Mobile Script
+  Версия: 1.0 FULL
+  Платформа: Roblox (для телефона с поддержкой джойстика)
+  Все функции полностью реализованы
+--]]
 
-local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
-if not player then player = Players.PlayerAdded:Wait() end
+-- Глобальные переменные
+local flyEnabled = false
+local flySpeed = 50
+local bodyVelocity = nil
+local bodyGyro = nil
+local noclipEnabled = false
+local noclipWalls = false
+local noclipFloor = false
+local noclipCeiling = false
+local espEnabled = false
+local espChestEnabled = false
+local espMobEnabled = false
+local espSize = 1
+local espHP = false
+local espDistance = false
+local speedHack = false
+local speedValue = 16
+local jumpPower = 50
+local infiniteJump = false
+local fovValue = 70
+local autoRun = false
+local autoRunSpeed = 16
+local walkSpeedValue = 16
+local flyControl = {Forward = 0, Right = 0, Up = 0}
+local rainbowHue = 0
+local rainbowSpeed = 1
+local currentColor = Color3.fromRGB(255,255,255)
+local scriptVisible = true
+local minimized = false
+local espObjects = {}
+local flyConnection = nil
+local noclipConnection = nil
+local espConnection = nil
+local rainbowConnection = nil
 
--- =========== ОПТИМИЗАЦИЯ ==========
-local frameSkip = 0
-local OPTIMIZATION_INTERVAL = 3 -- Каждый 3 кадр
-
--- =========== STORAGE ==========
-local Storage = Instance.new("Folder")
-Storage.Name = "BF_FixedFarm"
-pcall(function() Storage.Parent = player end)
-
-local function load(name, default)
-    local success, val = pcall(function() return Storage:GetAttribute(name) end)
-    if success and val ~= nil then return val end
-    return default
-end
-
-local function save(name, value)
-    pcall(function() Storage:SetAttribute(name, value) end)
-end
-
--- =========== SETTINGS ==========
-local settings = {
-    autoFarm = load("AutoFarm", false),
-    weaponType = load("WeaponType", "Combat"),
-    autoSkill = load("AutoSkill", true),
-    bringMobs = load("BringMobs", true),
-    farmRadius = load("FarmRadius", 200),
-    flyHeight = load("FlyHeight", 25),
-    attackRange = load("AttackRange", 60),
+-- Цвета
+local colors = {
+    {Name = "Красный", Color = Color3.fromRGB(255,0,0)},
+    {Name = "Зелёный", Color = Color3.fromRGB(0,255,0)},
+    {Name = "Синий", Color = Color3.fromRGB(0,0,255)},
+    {Name = "Жёлтый", Color = Color3.fromRGB(255,255,0)},
+    {Name = "Фиолетовый", Color = Color3.fromRGB(255,0,255)},
+    {Name = "Оранжевый", Color = Color3.fromRGB(255,165,0)},
+    {Name = "Белый", Color = Color3.fromRGB(255,255,255)},
+    {Name = "Радужный", Color = "rainbow"}
 }
 
-local state = {
-    autoFarm = settings.autoFarm,
-    weaponType = settings.weaponType,
-    autoSkill = settings.autoSkill,
-    bringMobs = settings.bringMobs,
-    farmRadius = settings.farmRadius,
-    flyHeight = settings.flyHeight,
-    attackRange = settings.attackRange,
-}
+-- UI элементы
+local screenGui = Instance.new("ScreenGui")
+local mainFrame = Instance.new("Frame")
+local topBar = Instance.new("Frame")
+local titleLabel = Instance.new("TextLabel")
+local authorLabel = Instance.new("TextLabel")
+local iconLabel = Instance.new("TextLabel")
+local closeBtn = Instance.new("TextButton")
+local minimizeBtn = Instance.new("TextButton")
+local colorBtn = Instance.new("TextButton")
+local rainbowSpeedSlider = Instance.new("Frame")
+local rainbowSliderFill = Instance.new("Frame")
+local rainbowKnob = Instance.new("Frame")
+local tabContainer = Instance.new("Frame")
+local homeTab = Instance.new("Frame")
+local flyTab = Instance.new("Frame")
+local espTab = Instance.new("Frame")
+local noclipTab = Instance.new("Frame")
+local movementTab = Instance.new("Frame")
+local currentTab = homeTab
+local draggingRainbow = false
 
--- =========== VARIABLES ==========
-local character, humanoid, rootPart
-local currentQuestMob = nil
-local currentQuestNPC = nil
-local currentIslandData = nil
-local farming = false
-local menuVisible = true
-local flyConn = nil
-local flyVel = nil
-local flyGyro = nil
-local isFlying = false
-local keysPressed = {}
-local lastAttackTime = 0
-local attackCooldown = 0.25
-local currentLevel = 0
-local lastLevelCheck = 0
-local mobCache = {}
-local cacheTime = 0
-local pullVelocities = {}
+-- Загрузочный экран
+local loadingFrame = Instance.new("Frame")
+local loadingLabel = Instance.new("TextLabel")
+local loadingAuthor = Instance.new("TextLabel")
 
--- =========== АВТО-ДЕТЕКТ УРОВНЯ ==========
-local function updatePlayerLevel()
-    pcall(function()
-        local ls = player:FindFirstChild("leaderstats")
-        if ls then
-            local lvl = ls:FindFirstChild("Level")
-            if lvl then currentLevel = lvl.Value end
-        end
-    end)
-    return currentLevel
+function createLoadingScreen()
+    loadingFrame.Size = UDim2.new(0.5, 0, 0.15, 0)
+    loadingFrame.Position = UDim2.new(0.25, 0, 0.425, 0)
+    loadingFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    loadingFrame.BackgroundTransparency = 1
+    loadingFrame.BorderSizePixel = 0
+    loadingFrame.Parent = screenGui
+    
+    loadingLabel.Size = UDim2.new(1,0,0.6,0)
+    loadingLabel.Position = UDim2.new(0,0,0.2,0)
+    loadingLabel.BackgroundTransparency = 1
+    loadingLabel.Text = "SCRIPT LOADING..."
+    loadingLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    loadingLabel.TextSize = 24
+    loadingLabel.Font = Enum.Font.GothamBold
+    loadingLabel.TextScaled = true
+    loadingLabel.Parent = loadingFrame
+    
+    loadingAuthor.Size = UDim2.new(1,0,0.3,0)
+    loadingAuthor.Position = UDim2.new(0,0,0.7,0)
+    loadingAuthor.BackgroundTransparency = 1
+    loadingAuthor.Text = "by Vanezy"
+    loadingAuthor.TextColor3 = Color3.fromRGB(150,150,150)
+    loadingAuthor.TextSize = 14
+    loadingAuthor.Font = Enum.Font.Gotham
+    loadingAuthor.TextScaled = true
+    loadingAuthor.Parent = loadingFrame
+    
+    local appear = TweenService:Create(loadingFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2})
+    appear:Play()
+    wait(2)
+    local disappear = TweenService:Create(loadingFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+    disappear:Play()
+    disappear.Completed:Wait()
+    loadingFrame:Destroy()
+    
+    local mainAppear = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {BackgroundTransparency = 0.05})
+    mainAppear:Play()
 end
 
--- =========== ДАННЫЕ ВСЕХ ОСТРОВОВ (авто-детект) ==========
--- Заполняется автоматически из игры, но для начала используем базу
-local islandsDatabase = {
-    -- Sea 1
-    [1] = {name="Pirate Village", minLvl=1, maxLvl=10, npcName="Quest Giver", mobs={"Bandit", "Traitor"}, islandPos=nil, npcPos=nil},
-    [5] = {name="Desert", minLvl=10, maxLvl=25, npcName="Quest Giver", mobs={"Desert Bandit", "Sandman"}, islandPos=nil, npcPos=nil},
-    [10] = {name="Jungle", minLvl=25, maxLvl=50, npcName="Quest Giver", mobs={"Jungle Warrior"}, islandPos=nil, npcPos=nil},
-    [15] = {name="Snow", minLvl=50, maxLvl=100, npcName="Quest Giver", mobs={"Snow Bandit"}, islandPos=nil, npcPos=nil},
-    [20] = {name="Magma", minLvl=100, maxLvl=150, npcName="Quest Giver", mobs={"Magma Soldier"}, islandPos=nil, npcPos=nil},
-    [25] = {name="Sky", minLvl=150, maxLvl=200, npcName="Quest Giver", mobs={"Sky Warrior"}, islandPos=nil, npcPos=nil},
-    -- Sea 2
-    [30] = {name="Kingdom of Rose", minLvl=700, maxLvl=850, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [35] = {name="Green Zone", minLvl=850, maxLvl=950, npcName="Quest Giver", mobs={"Militant"}, islandPos=nil, npcPos=nil},
-    [40] = {name="Graveyard", minLvl=950, maxLvl=1050, npcName="Quest Giver", mobs={"Reborn"}, islandPos=nil, npcPos=nil},
-    -- Sea 3
-    [45] = {name="Port Town", minLvl=1500, maxLvl=1650, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [50] = {name="Hydra Island", minLvl=1650, maxLvl=1800, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [55] = {name="Floating Turtle", minLvl=1800, maxLvl=2000, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [60] = {name="Mansion", minLvl=2000, maxLvl=2200, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [65] = {name="Great Tree", minLvl=2200, maxLvl=2350, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-    [70] = {name="Castle on Sea", minLvl=2350, maxLvl=2550, npcName="Quest Giver", mobs={"Pirate"}, islandPos=nil, npcPos=nil},
-}
-
--- =========== АВТО-ДЕТЕКТ ТЕКУЩЕГО ОСТРОВА ==========
-local function detectCurrentIsland()
-    local level = currentLevel
-    
-    local bestMatch = nil
-    for _, data in pairs(islandsDatabase) do
-        if level >= data.minLvl and level <= data.maxLvl then
-            if not bestMatch or data.minLvl > bestMatch.minLvl then
-                bestMatch = data
-            end
-        end
+function updateRainbow()
+    if currentColor == "rainbow" then
+        rainbowHue = (rainbowHue + 0.0167 * rainbowSpeed) % 1
+        local color = Color3.fromHSV(rainbowHue, 1, 1)
+        mainFrame.BackgroundColor3 = color
+        topBar.BackgroundColor3 = color
     end
-    
-    -- Если не нашли по уровню, ищем по позиции
-    if not bestMatch and rootPart then
-        local charPos = rootPart.Position
-        local minDist = 1000
-        for _, data in pairs(islandsDatabase) do
-            if data.islandPos then
-                local dist = (charPos - data.islandPos).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    bestMatch = data
-                end
-            end
-        end
-    end
-    
-    return bestMatch or islandsDatabase[1]
 end
 
--- =========== ПОИСК NPC ДЛЯ КВЕСТА ==========
-local function findQuestNPC()
-    -- Ищем ближайшего NPC с квестом
-    local nearestNPC = nil
-    local minDist = 500
+function createMainUI()
+    mainFrame.Size = UDim2.new(0, 350, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    mainFrame.BackgroundTransparency = 0.05
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
     
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            local name = obj.Name:lower()
-            if name:find("quest") or name:find("npc") or name:find("giver") or name:find("trainee") or name:find("teacher") then
-                local npcPos = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head")
-                if npcPos and rootPart then
-                    local dist = (npcPos.Position - rootPart.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        nearestNPC = obj
-                    end
-                end
-            end
-        end
-    end
+    topBar.Size = UDim2.new(1, 0, 0, 50)
+    topBar.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    topBar.BorderSizePixel = 0
+    topBar.Parent = mainFrame
     
-    return nearestNPC
-end
-
--- =========== ПОИСК НУЖНЫХ МОБОВ ДЛЯ КВЕСТА ==========
-local function findQuestMobs()
-    local islandData = detectCurrentIsland()
-    if not islandData then return {} end
+    titleLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "VANEZY UNIVERSAL"
+    titleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    titleLabel.TextSize = 20
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = topBar
     
-    local mobs = {}
-    if not rootPart then return mobs end
+    authorLabel.Size = UDim2.new(0.4, 0, 0.5, 0)
+    authorLabel.Position = UDim2.new(0.05, 0, 0.5, 0)
+    authorLabel.BackgroundTransparency = 1
+    authorLabel.Text = "Vanezy"
+    authorLabel.TextColor3 = Color3.fromRGB(180,180,180)
+    authorLabel.TextSize = 12
+    authorLabel.Font = Enum.Font.Gotham
+    authorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    authorLabel.Parent = topBar
     
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= character then
-            local name = obj.Name:lower()
-            local isTargetMob = false
-            
-            for _, mobName in pairs(islandData.mobs) do
-                if name:find(mobName:lower()) then
-                    isTargetMob = true
-                    break
-                end
-            end
-            
-            if isTargetMob then
-                local mobHrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head")
-                if mobHrp then
-                    local dist = (mobHrp.Position - rootPart.Position).Magnitude
-                    if dist < state.farmRadius then
-                        table.insert(mobs, {model = obj, hrp = mobHrp, distance = dist})
-                    end
-                end
-            end
-        end
-    end
+    iconLabel.Size = UDim2.new(0, 40, 1, 0)
+    iconLabel.Position = UDim2.new(1, -200, 0, 0)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Text = "🌙"
+    iconLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    iconLabel.TextSize = 30
+    iconLabel.Font = Enum.Font.GothamBold
+    iconLabel.Parent = topBar
     
-    return mobs
-end
-
--- =========== ВЗЯТИЕ КВЕСТА ==========
-local function takeQuest()
-    local npc = findQuestNPC()
-    if not npc then return false end
+    closeBtn.Size = UDim2.new(0, 40, 1, 0)
+    closeBtn.Position = UDim2.new(1, -40, 0, 0)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255,100,100)
+    closeBtn.TextSize = 20
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = topBar
     
-    -- Летим к NPC
-    local npcPos = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
-    if not npcPos then return false end
+    minimizeBtn.Size = UDim2.new(0, 40, 1, 0)
+    minimizeBtn.Position = UDim2.new(1, -80, 0, 0)
+    minimizeBtn.BackgroundTransparency = 1
+    minimizeBtn.Text = "−"
+    minimizeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    minimizeBtn.TextSize = 20
+    minimizeBtn.Font = Enum.Font.GothamBold
+    minimizeBtn.Parent = topBar
     
-    local arrived = false
-    repeat
-        RunService.RenderStepped:Wait()
-        arrived = flyToPosition(npcPos.Position, false)
-    until arrived
+    colorBtn.Size = UDim2.new(0, 60, 0.6, 0)
+    colorBtn.Position = UDim2.new(0.6, 0, 0.2, 0)
+    colorBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    colorBtn.Text = "Цвет"
+    colorBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    colorBtn.TextSize = 14
+    colorBtn.Parent = topBar
     
-    task.wait(0.5)
+    rainbowSpeedSlider.Size = UDim2.new(0.3, 0, 0.05, 0)
+    rainbowSpeedSlider.Position = UDim2.new(0.6, 0, 0.85, 0)
+    rainbowSpeedSlider.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    rainbowSpeedSlider.Visible = false
+    rainbowSpeedSlider.Parent = mainFrame
     
-    -- Взаимодействие с NPC
-    pcall(function()
-        -- Пробуем разные способы взятия квеста
-        local dialogRemote = npc:FindFirstChild("RemoteEvent") or npc:FindFirstChild("Dialog")
-        if dialogRemote then
-            dialogRemote:FireServer()
-        end
-        
-        -- Кликаем по NPC
-        local clickDetector = npc:FindFirstChild("ClickDetector")
-        if clickDetector then
-            clickDetector:Click()
-        end
-        
-        -- Через Remotes
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            local takeRemote = remotes:FindFirstChild("TakeQuest") or remotes:FindFirstChild("StartQuest") or remotes:FindFirstChild("Quest")
-            if takeRemote then
-                takeRemote:FireServer()
-            end
+    rainbowSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+    rainbowSliderFill.BackgroundColor3 = Color3.fromRGB(0,255,0)
+    rainbowSliderFill.BorderSizePixel = 0
+    rainbowSliderFill.Parent = rainbowSpeedSlider
+    
+    rainbowKnob.Size = UDim2.new(0, 10, 0, 20)
+    rainbowKnob.Position = UDim2.new(0.5, -5, 0.5, -10)
+    rainbowKnob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    rainbowKnob.BorderSizePixel = 0
+    rainbowKnob.Parent = rainbowSpeedSlider
+    
+    tabContainer.Size = UDim2.new(1, 0, 0, 40)
+    tabContainer.Position = UDim2.new(0, 0, 0, 50)
+    tabContainer.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    tabContainer.BorderSizePixel = 0
+    tabContainer.Parent = mainFrame
+    
+    createTabButtons()
+    createHomeTab()
+    createFlyTab()
+    createEspTab()
+    createNoclipTab()
+    createMovementTab()
+    
+    homeTab.Visible = true
+    
+    local dragStart, dragStartPos
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragStart = input.Position
+            dragStartPos = mainFrame.Position
         end
     end)
     
-    task.wait(1)
-    return true
-end
-
--- =========== ПОЛЁТ (ОПТИМИЗИРОВАННЫЙ) ==========
-local function startFly()
-    if flyConn then flyConn:Disconnect() end
-    if flyVel then flyVel:Destroy() end
-    if flyGyro then flyGyro:Destroy() end
-    
-    local char = player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    flyVel = Instance.new("BodyVelocity")
-    flyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    flyVel.P = 1e5
-    flyVel.Parent = hrp
-    
-    flyGyro = Instance.new("BodyGyro")
-    flyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-    flyGyro.P = 1e6
-    flyGyro.Parent = hrp
-    
-    isFlying = true
-    
-    flyConn = RunService.RenderStepped:Connect(function()
-        if not isFlying then return end
-        frameSkip = frameSkip + 1
-        if frameSkip % OPTIMIZATION_INTERVAL ~= 0 then return end
-        
-        local char = player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp or not flyVel or not flyGyro then return end
-        
-        local move = Vector3.new(
-            (keysPressed["D"] and 1 or 0) - (keysPressed["A"] and 1 or 0),
-            (keysPressed["E"] and 1 or 0) - (keysPressed["Q"] and 1 or 0),
-            (keysPressed["W"] and 1 or 0) - (keysPressed["S"] and 1 or 0)
-        )
-        if move.Magnitude > 0 then move = move.Unit end
-        
-        local cam = Workspace.CurrentCamera
-        if cam then
-            flyVel.Velocity = (cam.CFrame.RightVector * move.X + cam.CFrame.UpVector * move.Y + cam.CFrame.LookVector * move.Z) * 100
-            flyGyro.CFrame = cam.CFrame
+    topBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch and dragStart then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
         end
     end)
-end
-
-local function stopFly()
-    isFlying = false
-    if flyConn then flyConn:Disconnect() flyConn = nil end
-    if flyVel then flyVel:Destroy() flyVel = nil end
-    if flyGyro then flyGyro:Destroy() flyGyro = nil end
-end
-
-local function flyToPosition(targetPos, keepHeight)
-    if not targetPos then return false end
-    local char = player.Character
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
     
-    if not isFlying then
-        startFly()
-    end
-    
-    local target = targetPos
-    if keepHeight then
-        target = Vector3.new(targetPos.X, targetPos.Y + state.flyHeight, targetPos.Z)
-    end
-    
-    local distance = (target - hrp.Position).Magnitude
-    
-    if distance < 10 then
-        if flyVel then flyVel.Velocity = Vector3.new(0, 0, 0) end
-        return true
-    end
-    
-    local dir = (target - hrp.Position).Unit
-    if flyVel then
-        flyVel.Velocity = dir * 80
-    end
-    
-    return false
-end
-
--- =========== ПРИТЯГИВАНИЕ МОБОВ ==========
-local pulledMobs = {}
-local pullCleanupTime = 0.5
-
-local function pullMob(mob, targetPos)
-    if not mob or not mob.hrp then return end
-    
-    if pulledMobs[mob.model] then
-        if tick() - pulledMobs[mob.model] < 2 then return end
-    end
-    
-    pulledMobs[mob.model] = tick()
-    
-    local bodyVel = mob.model:FindFirstChild("TWKSPullVel")
-    if bodyVel then bodyVel:Destroy() end
-    
-    bodyVel = Instance.new("BodyVelocity")
-    bodyVel.Name = "TWKSPullVel"
-    bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    bodyVel.P = 8000
-    bodyVel.Parent = mob.model
-    
-    local dir = (targetPos - mob.hrp.Position).Unit
-    bodyVel.Velocity = dir * 40
-    
-    task.spawn(function()
-        task.wait(pullCleanupTime)
-        if bodyVel then bodyVel:Destroy() end
+    topBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragStart = nil
+        end
     end)
-end
-
-local function bringAllMobs()
-    if not state.bringMobs then return end
-    if not rootPart then return end
     
-    local mobs = findQuestMobs()
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        if flyEnabled then toggleFly() end
+        if noclipEnabled then toggleNoclip() end
+        if espEnabled then stopESP() end
+        if rainbowConnection then rainbowConnection:Disconnect() end
+    end)
     
-    -- Чистим старые ссылки
-    for model, _ in pairs(pulledMobs) do
-        if not model or not model.Parent then
-            pulledMobs[model] = nil
-        end
-    end
-    
-    -- Притягиваем мобов под игрока
-    local abovePos = Vector3.new(rootPart.Position.X, rootPart.Position.Y - 10, rootPart.Position.Z)
-    
-    for _, mob in ipairs(mobs) do
-        if mob.hrp and mob.model then
-            pullMob(mob, abovePos)
-        end
-    end
-end
-
--- =========== АТАКА С ВОЗДУХА (УВЕЛИЧЕННЫЙ РАДИУС) ==========
-local function attackFromAbove()
-    local char = player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    local mobs = findQuestMobs()
-    
-    if #mobs == 0 then return end
-    
-    -- Берём ближайшего моба
-    local targetMob = mobs[1]
-    
-    if targetMob and targetMob.hrp then
-        -- Наводим направление на моба
-        hrp.CFrame = CFrame.new(hrp.Position, targetMob.hrp.Position)
-        
-        -- Атака через Tool
-        pcall(function()
-            local tool = char:FindFirstChildWhichIsA("Tool")
-            if tool then
-                tool:Activate()
-            end
-            
-            -- Удалённая атака через Remote
-            local attackRemote = ReplicatedStorage:FindFirstChild("Remote")
-            if attackRemote then
-                attackRemote:FireServer("Attack")
-            end
-        end)
-        
-        -- Атака выбранным оружием
-        if state.weaponType == "Combat" then
-            pcall(function()
-                local humanoid = char:FindFirstChild("Humanoid")
-                if humanoid then
-                    local anim = humanoid:LoadAnimation(Instance.new("Animation"))
-                    pcall(function() anim:Play() end)
-                end
-            end)
-        elseif state.weaponType == "Fruit" then
-            pcall(function()
-                for _, t in pairs(char:GetChildren()) do
-                    if t:IsA("Tool") and (t.Name:lower():find("fruit") or t.Name:lower():find("blox")) then
-                        t:Activate()
-                        break
-                    end
-                end
-            end)
-        elseif state.weaponType == "Sword" then
-            pcall(function()
-                for _, t in pairs(char:GetChildren()) do
-                    if t:IsA("Tool") and (t.Name:lower():find("sword") or t.Name:lower():find("blade") or t.Name:lower():find("katana") or t.Name:lower():find("cutlass") or t.Name:lower():find("saber")) then
-                        t:Activate()
-                        break
-                    end
-                end
-            end)
-        elseif state.weaponType == "Gun" then
-            pcall(function()
-                for _, t in pairs(char:GetChildren()) do
-                    if t:IsA("Tool") and (t.Name:lower():find("gun") or t.Name:lower():find("pistol") or t.Name:lower():find("rifle") or t.Name:lower():find("musket")) then
-                        t:Activate()
-                        break
-                    end
-                end
-            end)
-        end
-        
-        -- Авто-скиллы
-        if state.autoSkill then
-            pcall(function()
-                local skills = {"Z", "X", "C", "V", "F"}
-                for _, skillName in ipairs(skills) do
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool then
-                        local skill = tool:FindFirstChild(skillName)
-                        if skill and skill:IsA("RemoteEvent") then
-                            skill:FireServer(targetMob.hrp.Position)
-                        end
-                    end
-                end
-            end)
-        end
-    end
-end
-
--- =========== ОСНОВНОЙ ЦИКЛ АВТОФАРМА (ОПТИМИЗИРОВАННЫЙ) ==========
-local farmCooldown = 0
-local lastMobCheck = 0
-local mobCheckInterval = 0.5
-local lastQuestCheck = 0
-local questCheckInterval = 3
-
-local function autoFarmLoop()
-    if not state.autoFarm then return end
-    
-    local now = tick()
-    
-    -- Проверка уровня каждые 2 секунды
-    if now - lastLevelCheck > 2 then
-        lastLevelCheck = now
-        updatePlayerLevel()
-    end
-    
-    local char = player.Character
-    if not char then return end
-    rootPart = char:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    -- Проверка мобов с интервалом
-    local mobs = {}
-    if now - lastMobCheck > mobCheckInterval then
-        lastMobCheck = now
-        mobs = findQuestMobs()
-    else
-        -- Используем кэш
-        mobs = mobCache
-    end
-    mobCache = mobs
-    
-    local islandData = detectCurrentIsland()
-    
-    if #mobs > 0 then
-        farming = true
-        
-        -- Находим центр скопления мобов
-        local centerPos = rootPart.Position
-        local mobCount = 0
-        
-        for _, mob in ipairs(mobs) do
-            if mob.hrp then
-                centerPos = centerPos + mob.hrp.Position
-                mobCount = mobCount + 1
-            end
-        end
-        
-        if mobCount > 0 then
-            centerPos = centerPos / mobCount
-        end
-        
-        -- Летим НАД мобами
-        local abovePos = Vector3.new(centerPos.X, centerPos.Y + state.flyHeight, centerPos.Z)
-        flyToPosition(abovePos, false)
-        
-        -- Собираем мобов под собой
-        bringAllMobs()
-        
-        -- Атакуем с задержкой
-        if now - lastAttackTime >= attackCooldown then
-            lastAttackTime = now
-            attackFromAbove()
-        end
-        
-        -- Сброс флага после уничтожения всех мобов
-        if mobCount == 0 and now - lastAttackTime > 5 then
-            farming = false
-        end
-        
-    else
-        if farming then
-            farming = false
-            -- Задержка перед проверкой квеста
-        end
-        
-        -- Проверка квеста и полёт к NPC
-        if now - lastQuestCheck > questCheckInterval then
-            lastQuestCheck = now
-            
-            if not currentQuestNPC then
-                takeQuest()
-            else
-                -- Летим к месту спавна мобов
-                if islandData and islandData.islandPos then
-                    flyToPosition(islandData.islandPos, false)
-                end
-            end
-        end
-    end
-end
-
--- =========== ЗАПУСК ЦИКЛА (С ОПТИМИЗАЦИЕЙ) ==========
-RunService.Heartbeat:Connect(function()
-    autoFarmLoop()
-end)
-
--- =========== КЛАВИАТУРА ==========
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    keysPressed[input.KeyCode.Name] = true
-    if input.KeyCode == Enum.KeyCode.RightAlt or input.KeyCode == Enum.KeyCode.VolumeUp then
-        menuVisible = not menuVisible
-        if ScreenGui then ScreenGui.Enabled = menuVisible end
-    end
-    if input.KeyCode == Enum.KeyCode.F9 then
-        if isFlying then
-            stopFly()
+    minimizeBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        if minimized then
+            mainFrame.Size = UDim2.new(0, 350, 0, 50)
+            tabContainer.Visible = false
+            minimizeBtn.Text = "□"
         else
-            startFly()
+            mainFrame.Size = UDim2.new(0, 350, 0, 500)
+            tabContainer.Visible = true
+            minimizeBtn.Text = "−"
         end
+    end)
+    
+    colorBtn.MouseButton1Click:Connect(function()
+        local currentIndex = 1
+        for i, col in ipairs(colors) do
+            if col.Color == currentColor or (type(currentColor)=="string" and col.Name=="Радужный") then
+                currentIndex = i % #colors + 1
+                break
+            end
+        end
+        local newColor = colors[currentIndex]
+        if newColor.Color == "rainbow" then
+            currentColor = "rainbow"
+            rainbowSpeedSlider.Visible = true
+            if rainbowConnection then rainbowConnection:Disconnect() end
+            rainbowConnection = RunService.RenderStepped:Connect(updateRainbow)
+        else
+            currentColor = newColor.Color
+            rainbowSpeedSlider.Visible = false
+            if rainbowConnection then rainbowConnection:Disconnect() end
+            mainFrame.BackgroundColor3 = currentColor
+            topBar.BackgroundColor3 = currentColor
+        end
+    end)
+    
+    rainbowKnob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            draggingRainbow = true
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            draggingRainbow = false
+        end
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        if draggingRainbow and rainbowSpeedSlider.Visible then
+            local touchPos = UserInputService:GetTouchPositions()[1]
+            if touchPos then
+                local relX = math.clamp((touchPos.X - rainbowSpeedSlider.AbsolutePosition.X) / rainbowSpeedSlider.AbsoluteSize.X, 0, 1)
+                rainbowSpeed = 0.5 + relX * 4.5
+                rainbowSliderFill.Size = UDim2.new(relX, 0, 1, 0)
+                rainbowKnob.Position = UDim2.new(relX, -5, 0.5, -10)
+            end
+        end
+    end)
+end
+
+function createTabButtons()
+    local tabs = {"🏠 Home", "✈ Fly", "👁 ESP", "🧱 Noclip", "⚡ Movement"}
+    local tabFrames = {homeTab, flyTab, espTab, noclipTab, movementTab}
+    
+    for i, tabName in ipairs(tabs) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.2, 0, 1, 0)
+        btn.Position = UDim2.new((i-1)*0.2, 0, 0, 0)
+        btn.BackgroundTransparency = 1
+        btn.Text = tabName
+        btn.TextColor3 = Color3.fromRGB(200,200,200)
+        btn.TextSize = 14
+        btn.Font = Enum.Font.Gotham
+        btn.Parent = tabContainer
+        
+        btn.MouseButton1Click:Connect(function()
+            currentTab.Visible = false
+            currentTab = tabFrames[i]
+            currentTab.Visible = true
+            for _, other in ipairs(tabContainer:GetChildren()) do
+                if other:IsA("TextButton") then
+                    other.TextColor3 = Color3.fromRGB(200,200,200)
+                end
+            end
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+        end)
     end
-end)
+end
 
-UserInputService.InputEnded:Connect(function(input)
-    keysPressed[input.KeyCode.Name] = false
-end)
-
--- =========== ПЕРЕРОЖДЕНИЕ ==========
-player.CharacterAdded:Connect(function(newChar)
-    task.wait(0.5)
-    character = newChar
-    humanoid = newChar:FindFirstChild("Humanoid")
-    rootPart = newChar:FindFirstChild("HumanoidRootPart")
-    if humanoid then humanoid.WalkSpeed = 16 end
-    if state.autoFarm then
-        task.wait(0.2)
-        startFly()
+function createHomeTab()
+    homeTab.Size = UDim2.new(1, 0, 1, -40)
+    homeTab.Position = UDim2.new(0, 0, 0, 40)
+    homeTab.BackgroundTransparency = 1
+    homeTab.Parent = mainFrame
+    
+    local devLabel = Instance.new("TextLabel")
+    devLabel.Size = UDim2.new(0.9, 0, 0.1, 0)
+    devLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
+    devLabel.BackgroundTransparency = 1
+    devLabel.Text = "Разработчик: Vanezy"
+    devLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    devLabel.TextSize = 16
+    devLabel.Font = Enum.Font.GothamBold
+    devLabel.TextXAlignment = Enum.TextXAlignment.Left
+    devLabel.Parent = homeTab
+    
+    local socials = {"Discord: vanezy.gg", "Telegram: @vanezy", "GitHub: /vanezy", "YouTube: @VanezyScripts"}
+    for i, social in ipairs(socials) do
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.9, 0, 0.08, 0)
+        lbl.Position = UDim2.new(0.05, 0, 0.2 + (i-1)*0.1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = social
+        lbl.TextColor3 = Color3.fromRGB(180,180,255)
+        lbl.TextSize = 14
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = homeTab
     end
-    -- Очистка кэша
-    mobCache = {}
-    pulledMobs = {}
-end)
+    
+    local versionLabel = Instance.new("TextLabel")
+    versionLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
+    versionLabel.Position = UDim2.new(0.05, 0, 0.85, 0)
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Text = "Версия: 1.0 FULL | Mobile Optimized"
+    versionLabel.TextColor3 = Color3.fromRGB(150,150,150)
+    versionLabel.TextSize = 12
+    versionLabel.Font = Enum.Font.Gotham
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    versionLabel.Parent = homeTab
+    
+    local thanksLabel = Instance.new("TextLabel")
+    thanksLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
+    thanksLabel.Position = UDim2.new(0.05, 0, 0.75, 0)
+    thanksLabel.BackgroundTransparency = 1
+    thanksLabel.Text = "Спасибо за использование!"
+    thanksLabel.TextColor3 = Color3.fromRGB(100,255,100)
+    thanksLabel.TextSize = 12
+    thanksLabel.Font = Enum.Font.Gotham
+    thanksLabel.TextXAlignment = Enum.TextXAlignment.Left
+    thanksLabel.Parent = homeTab
+end
 
--- =========== СОЗДАНИЕ GUI ==========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BF_FixedFarm"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Enabled = true
+function createFlyTab()
+    flyTab.Size = UDim2.new(1, 0, 1, -40)
+    flyTab.Position = UDim2.new(0, 0, 0, 40)
+    flyTab.BackgroundTransparency = 1
+    flyTab.Visible = false
+    flyTab.Parent = mainFrame
+    
+    local flyToggle = createToggle("Флай", false, flyTab, 0.05)
+    local speedSlider = createSlider("Скорость флая", 10, 200, flySpeed, flyTab, 0.2, function(v) flySpeed = v end)
+    
+    flyToggle.OnToggle:Connect(function(enabled)
+        if enabled then 
+            toggleFly() 
+        else 
+            toggleFly() 
+        end
+    end)
+    
+    local joyStickFrame = Instance.new("Frame")
+    joyStickFrame.Size = UDim2.new(0, 120, 0, 120)
+    joyStickFrame.Position = UDim2.new(0.65, 0, 0.45, 0)
+    joyStickFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    joyStickFrame.BackgroundTransparency = 0.5
+    joyStickFrame.BorderSizePixel = 0
+    joyStickFrame.Parent = flyTab
+    
+    local stick = Instance.new("Frame")
+    stick.Size = UDim2.new(0, 45, 0, 45)
+    stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+    stick.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    stick.BorderSizePixel = 0
+    stick.Parent = joyStickFrame
+    
+    local joyActive = false
+    local joyStart = nil
+    
+    joyStickFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            joyActive = true
+            joyStart = input.Position
+        end
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        if not flyEnabled then return end
+        if joyActive and UserInputService:GetTouchPositions()[1] then
+            local touchPos = UserInputService:GetTouchPositions()[1]
+            local delta = touchPos - joyStart
+            local angle = math.atan2(delta.Y, delta.X)
+            local magnitude = math.min(delta.Magnitude, 60)
+            stick.Position = UDim2.new(0.5, (math.cos(angle)*magnitude)-22.5, 0.5, (math.sin(angle)*magnitude)-22.5)
+            flyControl.Forward = -math.sin(angle) * (magnitude/60)
+            flyControl.Right = math.cos(angle) * (magnitude/60)
+        else
+            stick.Position = UDim2.new(0.5, -22.5, 0.5, -22.5)
+            flyControl.Forward = 0
+            flyControl.Right = 0
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            joyActive = false
+        end
+    end)
+    
+    local upBtn = Instance.new("TextButton")
+    upBtn.Size = UDim2.new(0, 60, 0, 60)
+    upBtn.Position = UDim2.new(0.05, 0, 0.6, 0)
+    upBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    upBtn.Text = "▲"
+    upBtn.TextSize = 30
+    upBtn.Font = Enum.Font.GothamBold
+    upBtn.Parent = flyTab
+    
+    local downBtn = Instance.new("TextButton")
+    downBtn.Size = UDim2.new(0, 60, 0, 60)
+    downBtn.Position = UDim2.new(0.05, 0, 0.8, 0)
+    downBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    downBtn.Text = "▼"
+    downBtn.TextSize = 30
+    downBtn.Font = Enum.Font.GothamBold
+    downBtn.Parent = flyTab
+    
+    upBtn.MouseButton1Down:Connect(function() flyControl.Up = 1 end)
+    upBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
+    downBtn.MouseButton1Down:Connect(function() flyControl.Up = -1 end)
+    downBtn.MouseButton1Up:Connect(function() flyControl.Up = 0 end)
+    
+    local infoLabel = Instance.new("TextLabel")
+    infoLabel.Size = UDim2.new(0.5, 0, 0.08, 0)
+    infoLabel.Position = UDim2.new(0.05, 0, 0.05, 0)
+    infoLabel.BackgroundTransparency = 1
+    infoLabel.Text = "Джойстик - движение по X/Z"
+    infoLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    infoLabel.TextSize = 12
+    infoLabel.Font = Enum.Font.Gotham
+    infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+    infoLabel.Parent = flyTab
+end
 
-local guiParent = nil
-pcall(function() guiParent = player:WaitForChild("PlayerGui", 2) end)
-if not guiParent then pcall(function() guiParent = game:GetService("CoreGui") end) end
-if guiParent then pcall(function() ScreenGui.Parent = guiParent end) end
+function createEspTab()
+    espTab.Size = UDim2.new(1, 0, 1, -40)
+    espTab.Position = UDim2.new(0, 0, 0, 40)
+    espTab.BackgroundTransparency = 1
+    espTab.Visible = false
+    espTab.Parent = mainFrame
+    
+    local espToggle = createToggle("ESP Игроков", false, espTab, 0.05)
+    local chestToggle = createToggle("ESP Сундуков", false, espTab, 0.15)
+    local mobToggle = createToggle("ESP Мобов", false, espTab, 0.25)
+    local sizeSlider = createSlider("ESP Размер", 0.5, 3, espSize, espTab, 0.35, function(v) espSize = v end)
+    local hpToggle = createToggle("ESP ХП", false, espTab, 0.45)
+    local distToggle = createToggle("ESP Расстояние", false, espTab, 0.55)
+    
+    espToggle.OnToggle:Connect(function(v) 
+        espEnabled = v
+        if v then 
+            startESP() 
+        else 
+            stopESP() 
+        end
+    end)
+    chestToggle.OnToggle:Connect(function(v) espChestEnabled = v end)
+    mobToggle.OnToggle:Connect(function(v) espMobEnabled = v end)
+    hpToggle.OnToggle:Connect(function(v) espHP = v end)
+    distToggle.OnToggle:Connect(function(v) espDistance = v end)
+end
 
--- =========== МЕНЮ ==========
-local MENU_WIDTH = 340
-local MENU_HEIGHT = 500
+function createNoclipTab()
+    noclipTab.Size = UDim2.new(1, 0, 1, -40)
+    noclipTab.Position = UDim2.new(0, 0, 0, 40)
+    noclipTab.BackgroundTransparency = 1
+    noclipTab.Visible = false
+    noclipTab.Parent = mainFrame
+    
+    local noclipToggle = createToggle("Сквозь стены", false, noclipTab, 0.05)
+    local floorToggle = createToggle("Сквозь пол", false, noclipTab, 0.15)
+    local ceilingToggle = createToggle("Сквозь потолок", false, noclipTab, 0.25)
+    
+    noclipToggle.OnToggle:Connect(function(v) 
+        noclipWalls = v
+        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
+        toggleNoclip()
+    end)
+    floorToggle.OnToggle:Connect(function(v) 
+        noclipFloor = v
+        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
+        toggleNoclip()
+    end)
+    ceilingToggle.OnToggle:Connect(function(v) 
+        noclipCeiling = v
+        noclipEnabled = noclipWalls or noclipFloor or noclipCeiling
+        toggleNoclip()
+    end)
+end
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, MENU_WIDTH, 0, MENU_HEIGHT)
-MainFrame.Position = UDim2.new(0.5, -MENU_WIDTH/2, 0.5, -MENU_HEIGHT/2)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
-MainFrame.BackgroundTransparency = 0.05
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
+function createMovementTab()
+    movementTab.Size = UDim2.new(1, 0, 1, -40)
+    movementTab.Position = UDim2.new(0, 0, 0, 40)
+    movementTab.BackgroundTransparency = 1
+    movementTab.Visible = false
+    movementTab.Parent = mainFrame
+    
+    local walkSlider = createSlider("Speed ходьбы", 16, 100, walkSpeedValue, movementTab, 0.05, function(v) 
+        walkSpeedValue = v
+        if not speedHack and not autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then 
+            player.Character.Humanoid.WalkSpeed = v 
+        end
+    end)
+    local jumpSlider = createSlider("Прыжок", 50, 200, jumpPower, movementTab, 0.18, function(v) 
+        jumpPower = v
+        if player.Character and player.Character:FindFirstChild("Humanoid") then 
+            player.Character.Humanoid.JumpPower = v 
+        end
+    end)
+    local speedToggle = createToggle("Спидхак", false, movementTab, 0.31)
+    local speedValueSlider = createSlider("Спидхак скорость", 16, 500, speedValue, movementTab, 0.41, function(v) 
+        speedValue = v
+        if speedHack and player.Character and player.Character:FindFirstChild("Humanoid") then 
+            player.Character.Humanoid.WalkSpeed = v 
+        end
+    end)
+    local infiniteToggle = createToggle("Бесконечные прыжки", false, movementTab, 0.54)
+    local fovSlider = createSlider("FOV", 70, 120, fovValue, movementTab, 0.64, function(v) 
+        fovValue = v
+        game.Workspace.CurrentCamera.FieldOfView = v 
+    end)
+    local autoRunSpeedSlider = createSlider("Автобег скорость", 16, 100, autoRunSpeed, movementTab, 0.74, function(v) 
+        autoRunSpeed = v
+        if autoRun and player.Character and player.Character:FindFirstChild("Humanoid") then 
+            player.Character.Humanoid.WalkSpeed = v 
+        end
+    end)
+    local autoRunToggle = createToggle("Автобег", false, movementTab, 0.87)
+    
+    speedToggle.OnToggle:Connect(function(v) 
+        speedHack = v
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            if v then 
+                player.Character.Humanoid.WalkSpeed = speedValue 
+            else 
+                player.Character.Humanoid.WalkSpeed = walkSpeedValue 
+            end
+        end
+    end)
+    infiniteToggle.OnToggle:Connect(function(v) infiniteJump = v end)
+    autoRunToggle.OnToggle:Connect(function(v) 
+        autoRun = v
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            if v then 
+                player.Character.Humanoid.WalkSpeed = autoRunSpeed
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local bodyVel = Instance.new("BodyVelocity")
+                    bodyVel.MaxForce = Vector3.new(1e6, 0, 1e6)
+                    bodyVel.Velocity = hrp.CFrame.LookVector * autoRunSpeed
+                    bodyVel.Parent = hrp
+                    task.wait(0.1)
+                    bodyVel:Destroy()
+                end
+            else 
+                player.Character.Humanoid.WalkSpeed = walkSpeedValue 
+            end
+        end
+    end)
+    
+    UserInputService.JumpRequest:Connect(function()
+        if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+end
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 14)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(80, 200, 255)
-MainStroke.Thickness = 1.5
-MainStroke.Parent = MainFrame
-
--- Header
-local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 60)
-Header.BackgroundColor3 = Color3.fromRGB(30, 35, 50)
-Header.BorderSizePixel = 0
-Header.Parent = MainFrame
-
-local HeaderCorner = Instance.new("UICorner")
-HeaderCorner.CornerRadius = UDim.new(0, 14)
-HeaderCorner.Parent = Header
-
-local Title = Instance.new("TextLabel")
-Title.Text = "🛡️ BLOX FRUITS ULTIMATE v3"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextColor3 = Color3.fromRGB(80, 200, 255)
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, -80, 0, 25)
-Title.Position = UDim2.new(0, 12, 0, 8)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = Header
-
-local LevelText = Instance.new("TextLabel")
-LevelText.Text = "📊 Level: " .. currentLevel
-LevelText.Font = Enum.Font.Gotham
-LevelText.TextSize = 11
-LevelText.TextColor3 = Color3.fromRGB(200, 200, 220)
-LevelText.BackgroundTransparency = 1
-LevelText.Size = UDim2.new(1, -80, 0, 20)
-LevelText.Position = UDim2.new(0, 12, 0, 34)
-LevelText.TextXAlignment = Enum.TextXAlignment.Left
-LevelText.Parent = Header
-
--- Обновление уровня в UI
-task.spawn(function()
-    while true do
-        task.wait(1)
-        LevelText.Text = "📊 Level: " .. currentLevel
-    end
-end)
-
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 32, 0, 28)
-MinimizeBtn.Position = UDim2.new(1, -70, 0.5, -14)
-MinimizeBtn.Text = "−"
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 20
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
-MinimizeBtn.BorderSizePixel = 0
-MinimizeBtn.Parent = Header
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 8)
-minCorner.Parent = MinimizeBtn
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 32, 0, 28)
-CloseBtn.Position = UDim2.new(1, -36, 0.5, -14)
-CloseBtn.Text = "✕"
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.BorderSizePixel = 0
-CloseBtn.Parent = Header
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 8)
-closeCorner.Parent = CloseBtn
-
--- Scrolling Frame
-local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, -10, 1, -75)
-ScrollingFrame.Position = UDim2.new(0, 5, 0, 70)
-ScrollingFrame.BackgroundTransparency = 1
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 550)
-ScrollingFrame.ScrollBarThickness = 3
-ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 200, 255)
-ScrollingFrame.Parent = MainFrame
-
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 0, 550)
-Content.BackgroundTransparency = 1
-Content.Parent = ScrollingFrame
-
--- UI Helpers
-local function addToggle(parent, text, y, defaultValue, callback)
+function createToggle(text, defaultValue, parent, yPos, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -16, 0, 44)
-    frame.Position = UDim2.new(0, 8, 0, y)
-    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-    frame.BackgroundTransparency = 0.4
-    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(0.9, 0, 0, 40)
+    frame.Position = UDim2.new(0.05, 0, yPos, 0)
+    frame.BackgroundTransparency = 1
     frame.Parent = parent
-    local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, 8)
-    frameCorner.Parent = frame
     
     local label = Instance.new("TextLabel")
-    label.Text = text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 12
-    label.TextColor3 = Color3.fromRGB(220, 220, 230)
+    label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Size = UDim2.new(0.55, 0, 1, 0)
-    label.Position = UDim2.new(0, 12, 0, 0)
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
     
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 55, 0, 28)
-    btn.Position = UDim2.new(1, -63, 0.5, -14)
-    btn.Text = defaultValue and "ON" or "OFF"
-    btn.Font = Enum.Font.GothamBold
+    btn.Size = UDim2.new(0, 50, 0, 30)
+    btn.Position = UDim2.new(0.85, -25, 0.5, -15)
+    btn.BackgroundColor3 = defaultValue and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+    btn.Text = defaultValue and "Вкл" or "Выкл"
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
     btn.TextSize = 12
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 170, 90) or Color3.fromRGB(55, 55, 68)
-    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamBold
     btn.Parent = frame
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    btnCorner.Parent = btn
     
-    local val = defaultValue
+    local toggled = defaultValue
+    local event = Instance.new("BindableEvent")
+    
     btn.MouseButton1Click:Connect(function()
-        val = not val
-        btn.Text = val and "ON" or "OFF"
-        btn.BackgroundColor3 = val and Color3.fromRGB(0, 170, 90) or Color3.fromRGB(55, 55, 68)
-        if callback then callback(val) end
-    end)
-    if callback and defaultValue then task.spawn(function() callback(defaultValue) end) end
-    return btn
-end
-
-local function addDropdown(parent, text, y, options, defaultVal, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -16, 0, 44)
-    frame.Position = UDim2.new(0, 8, 0, y)
-    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-    frame.BackgroundTransparency = 0.4
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-    local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, 8)
-    frameCorner.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Text = text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 12
-    label.TextColor3 = Color3.fromRGB(220, 220, 230)
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(0.35, 0, 1, 0)
-    label.Position = UDim2.new(0, 12, 0, 0)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
-    
-    local dropdown = Instance.new("TextButton")
-    dropdown.Size = UDim2.new(0.5, -10, 0, 30)
-    dropdown.Position = UDim2.new(0.45, 0, 0.5, -15)
-    dropdown.Text = defaultVal or options[1]
-    dropdown.Font = Enum.Font.Gotham
-    dropdown.TextSize = 11
-    dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-    dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    dropdown.BorderSizePixel = 0
-    dropdown.Parent = frame
-    local dropCorner = Instance.new("UICorner")
-    dropCorner.CornerRadius = UDim.new(0, 6)
-    dropCorner.Parent = dropdown
-    
-    local selected = defaultVal or options[1]
-    dropdown.MouseButton1Click:Connect(function()
-        local idx = 1
-        for i, opt in ipairs(options) do
-            if opt == selected then idx = i end
-        end
-        local nextIdx = idx % #options + 1
-        selected = options[nextIdx]
-        dropdown.Text = selected        if callback then callback(selected) end
+        toggled = not toggled
+        btn.BackgroundColor3 = toggled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        btn.Text = toggled and "Вкл" or "Выкл"
+        event:Fire(toggled)
+        if callback then callback(toggled) end
     end)
     
-    return dropdown
-end
-
-local function addSlider(parent, text, y, minVal, maxVal, defaultVal, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, -16, 0, 62)
-    frame.Position = UDim2.new(0, 8, 0, y)
-    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-    frame.BackgroundTransparency = 0.4
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-    local frameCorner = Instance.new("UICorner")
-    frameCorner.CornerRadius = UDim.new(0, 8)
-    frameCorner.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Text = text .. " [" .. tostring(defaultVal) .. "]"
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 11
-    label.TextColor3 = Color3.fromRGB(200, 200, 210)
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1, -16, 0, 22)
-    label.Position = UDim2.new(0, 8, 0, 6)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
-    
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(1, -24, 0, 4)
-    bar.Position = UDim2.new(0, 12, 0, 42)
-    bar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    bar.BorderSizePixel = 0
-    bar.Parent = frame
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(1, 0)
-    barCorner.Parent = bar
-    
-    local ratio = (defaultVal - minVal) / (maxVal - minVal)
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(ratio, 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(80, 200, 255)
-    fill.BorderSizePixel = 0
-    fill.Parent = bar
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(1, 0)
-    fillCorner.Parent = fill
-    
-    local currentVal = defaultVal
-    local dragging = false
-    
-    local function update(input)
-        local barPos = bar.AbsolutePosition
-        local barSize = bar.AbsoluteSize
-        if not barPos or not barSize or barSize.X == 0 then return end
-        local percent = math.clamp((input.Position.X - barPos.X) / barSize.X, 0, 1)
-        local val = math.floor((minVal + (maxVal - minVal) * percent) * 10 + 0.5) / 10
-        fill.Size = UDim2.new(percent, 0, 1, 0)
-        label.Text = text .. " [" .. tostring(val) .. "]"
-        currentVal = val
-        if callback then callback(val) end
-    end
-    
-    bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            update(input)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            update(input)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    
-    if callback then callback(defaultVal) end
-    return {setValue = function(v) 
-        local r = math.clamp((v - minVal) / (maxVal - minVal), 0, 1)
-        fill.Size = UDim2.new(r, 0, 1, 0)
-        label.Text = text .. " [" .. tostring(v) .. "]"
+    return {OnToggle = event.Event, SetValue = function(v) 
+        toggled = v
+        btn.BackgroundColor3 = v and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        btn.Text = v and "Вкл" or "Выкл"
+        event:Fire(v)
         if callback then callback(v) end
     end}
 end
 
--- Build UI
-local y = 8
-
-addToggle(Content, "⚡ ULTIMATE AUTO FARM", y, state.autoFarm, function(val)
-    state.autoFarm = val
-    save("AutoFarm", val)
-    if val then
-        startFly()
-    else
-        stopFly()
+function createSlider(text, minVal, maxVal, defaultValue, parent, yPos, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.9, 0, 0, 50)
+    frame.Position = UDim2.new(0.05, 0, yPos, 0)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 0.4, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. tostring(defaultValue)
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new(0.8, 0, 0, 4)
+    slider.Position = UDim2.new(0, 0, 0.7, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    slider.BorderSizePixel = 0
+    slider.Parent = frame
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((defaultValue-minVal)/(maxVal-minVal), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0,255,0)
+    fill.BorderSizePixel = 0
+    fill.Parent = slider
+    
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 12, 0, 12)
+    knob.Position = UDim2.new((defaultValue-minVal)/(maxVal-minVal), -6, 0.5, -6)
+    knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    knob.BorderSizePixel = 0
+    knob.Parent = slider
+    
+    local dragging = false
+    
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    local function update(pos)
+        local relX = math.clamp((pos.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+        local val = minVal + relX * (maxVal - minVal)
+        val = math.floor(val * 10) / 10
+        label.Text = text .. ": " .. tostring(val)
+        fill.Size = UDim2.new(relX, 0, 1, 0)
+        knob.Position = UDim2.new(relX, -6, 0.5, -6)
+        callback(val)
     end
-end)
-y = y + 52
-
-addDropdown(Content, "⚔️ WEAPON TYPE", y, {"Combat", "Fruit", "Sword", "Gun"}, state.weaponType, function(val)
-    state.weaponType = val
-    save("WeaponType", val)
-end)
-y = y + 52
-
-addToggle(Content, "🎯 AUTO SKILL (Z/X/C/V/F)", y, state.autoSkill, function(val)
-    state.autoSkill = val
-    save("AutoSkill", val)
-end)
-y = y + 52
-
-addToggle(Content, "🔄 BRING MOBS TOGETHER", y, state.bringMobs, function(val)
-    state.bringMobs = val
-    save("BringMobs", val)
-end)
-y = y + 52
-
-addSlider(Content, "📡 FARM RADIUS", y, 100, 400, state.farmRadius, function(val)
-    state.farmRadius = val
-    save("FarmRadius", val)
-end)
-y = y + 70
-
-addSlider(Content, "🚁 FLY HEIGHT", y, 15, 50, state.flyHeight, function(val)
-    state.flyHeight = val
-    save("FlyHeight", val)
-end)
-y = y + 70
-
-addSlider(Content, "🎯 ATTACK RANGE", y, 30, 80, state.attackRange, function(val)
-    state.attackRange = val
-    save("AttackRange", val)
-end)
-y = y + 70
-
--- Info panel
-local infoFrame = Instance.new("Frame")
-infoFrame.Size = UDim2.new(1, -16, 0, 85)
-infoFrame.Position = UDim2.new(0, 8, 0, y)
-infoFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-infoFrame.BackgroundTransparency = 0.4
-infoFrame.BorderSizePixel = 0
-infoFrame.Parent = Content
-local infoCorner = Instance.new("UICorner")
-infoCorner.CornerRadius = UDim.new(0, 8)
-infoCorner.Parent = infoFrame
-
-local infoText = Instance.new("TextLabel")
-infoText.Text = "📖 ИНФОРМАЦИЯ:\n🔹 Авто-детект уровня и острова\n🔹 Плавный полёт НАД мобами\n🔹 Притягивание мобов под игрока\n🔹 Увеличенный радиус атаки\n🔹 F9 - ручной полёт\n🔹 RightAlt/Volume± - скрыть меню"
-infoText.Font = Enum.Font.Gotham
-infoText.TextSize = 10
-infoText.TextColor3 = Color3.fromRGB(180, 180, 200)
-infoText.BackgroundTransparency = 1
-infoText.Size = UDim2.new(1, -16, 1, -8)
-infoText.Position = UDim2.new(0, 8, 0, 4)
-infoText.TextXAlignment = Enum.TextXAlignment.Left
-infoText.TextYAlignment = Enum.TextYAlignment.Top
-infoText.Parent = infoFrame
-
--- Drag system
-local dragActive = false
-local dragStart, frameStart
-Header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragActive = true
-        dragStart = input.Position
-        frameStart = MainFrame.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragActive and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragActive = false
-    end
-end)
-
--- Minimize/Close
-local minimized = false
-local originalHeight = MENU_HEIGHT
-
-MinimizeBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        MainFrame:TweenSize(UDim2.new(0, MENU_WIDTH, 0, 60), "Out", "Quad", 0.2)
-    else
-        MainFrame:TweenSize(UDim2.new(0, MENU_WIDTH, 0, originalHeight), "Out", "Quad", 0.2)
-    end
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    if state.autoFarm then
-        stopFly()
-    end
-    TweenService:Create(MainFrame, TweenInfo.new(0.15), {Size = UDim2.new(0, 0, 0, 0)}):Play()
-    task.wait(0.15)
-    ScreenGui:Destroy()
-end)
-
--- Init
-updatePlayerLevel()
-if state.autoFarm then
-    startFly()
+    
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local touchPos = UserInputService:GetTouchPositions()[1]
+            if touchPos then update(touchPos) end
+        end
+    end)
 end
 
-print("═══════════════════════════════════════════")
-print("🛡️ BLOX FRUITS ULTIMATE v3 - FIXED")
-print("📌 Исправлен лаг (уменьшена нагрузка)")
-print("📌 Авто-детект уровня и квестов")
-print("📌 Полёт над мобами + притягивание")
-print("📌 RightAlt/Volume± - скрыть меню")
-print("📌 F9 - ручной полёт")
-print("═══════════════════════════════════════════")
+function toggleFly()
+    flyEnabled = not flyEnabled
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if flyEnabled then
+        humanoid.PlatformStand = true
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bodyVelocity.Parent = char:FindFirstChild("HumanoidRootPart")
+        
+        bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        bodyGyro.CFrame = char:FindFirstChild("HumanoidRootPart").CFrame
+        bodyGyro.Parent = char:FindFirstChild("HumanoidRootPart")
+        
+        if flyConnection then flyConnection:Disconnect() end
+        flyConnection = RunService.RenderStepped:Connect(function()
+            if not flyEnabled or not bodyVelocity or not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            local cam = workspace.CurrentCamera
+            local cf = cam.CFrame
+            local moveDir = (cf.LookVector * flyControl.Forward) + (cf.RightVector * flyControl.Right) + (Vector3.new(0, flyControl.Up, 0))
+            if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
+            bodyVelocity.Velocity = moveDir * flySpeed
+            if bodyGyro then
+                bodyGyro.CFrame = cam.CFrame
+            end
+        end)
+    else
+        humanoid.PlatformStand = false
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
+        bodyVelocity = nil
+        bodyGyro = nil
+        if flyConnection then flyConnection:Disconnect() end
+    end
+end
+
+function toggleNoclip()
+    if noclipEnabled then
+        if noclipConnection then noclipConnection:Disconnect() end
+        noclipConnection = RunService.RenderStepped:Connect(function()
+            local char = player.Character
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            
+            if noclipWalls then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+            
+            if noclipFloor then
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {char}
+                params.FilterType = Enum.RaycastFilterType.Blacklist
+                local floorCheck = workspace:Raycast(hrp.Position, Vector3.new(0, -3, 0), params)
+                if floorCheck and floorCheck.Instance then
+                    floorCheck.Instance.CanCollide = false
+                    task.wait(0.1)
+                    floorCheck.Instance.CanCollide = true
+                end
+            end
+            
+            if noclipCeiling then
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {char}
+                params.FilterType = Enum.RaycastFilterType.Blacklist
+                local ceilCheck = workspace:Raycast(hrp.Position, Vector3.new(0, 3, 0), params)
+                if ceilCheck and ceilCheck.Instance then
+                    ceilCheck.Instance.CanCollide = false
+                    task.wait(0.1)
+                    ceilCheck.Instance.CanCollide = true
+                end
+            end
+        end)
+    else
+        if noclipConnection then noclipConnection:Disconnect() end
+        local char = player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+function createESP(instance, color, text)
+    if espObjects[instance] then 
+        if espObjects[instance].bill then espObjects[instance].bill:Destroy() end
+        espObjects[instance] = nil
+    end
+    
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
+    bill.StudsOffset = Vector3.new(0, 2.5, 0)
+    bill.AlwaysOnTop = true
+    bill.Parent = instance
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1,0,1,0)
+    frame.BackgroundTransparency = 0.5
+    frame.BackgroundColor3 = color
+    frame.BorderSizePixel = 0
+    frame.Parent = bill
+    
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1,0,0.5,0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = text
+    nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    nameLabel.TextScaled = true
+    nameLabel.Parent = frame
+    
+    local hpBar = nil
+    local distLabel = nil
+    
+    if espHP then
+        hpBar = Instance.new("Frame")
+        hpBar.Size = UDim2.new(1,0,0.2,0)
+        hpBar.Position = UDim2.new(0,0,0.8,0)
+        hpBar.BackgroundColor3 = Color3.fromRGB(0,255,0)
+        hpBar.BorderSizePixel = 0
+        hpBar.Parent = frame
+    end
+    
+    espObjects[instance] = {bill = bill, hpBar = hpBar, distLabel = distLabel, frame = frame, nameLabel = nameLabel}
+    return bill
+end
+
+function updateESP()
+    if not espEnabled then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local rootPos = char.HumanoidRootPart.Position
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local dist = (plr.Character.HumanoidRootPart.Position - rootPos).Magnitude
+            local humanoid = plr.Character:FindFirstChild("Humanoid")
+            local hpPercent = humanoid and (humanoid.Health / humanoid.MaxHealth) or 1
+            
+            if not espObjects[plr.Character] then
+                createESP(plr.Character, Color3.fromRGB(255,0,0), plr.Name)
+            else
+                local data = espObjects[plr.Character]
+                if data.bill then
+                    data.bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
+                end
+                if espDistance and data.distLabel then
+                    data.distLabel.Text = math.floor(dist) .. "m"
+                elseif espDistance and not data.distLabel then
+                    data.distLabel = Instance.new("TextLabel")
+                    data.distLabel.Size = UDim2.new(1,0,0.3,0)
+                    data.distLabel.Position = UDim2.new(0,0,0,0)
+                    data.distLabel.BackgroundTransparency = 1
+                    data.distLabel.Text = math.floor(dist) .. "m"
+                    data.distLabel.TextColor3 = Color3.fromRGB(255,255,0)
+                    data.distLabel.TextScaled = true
+                    data.distLabel.Parent = data.frame
+                elseif not espDistance and data.distLabel then
+                    data.distLabel:Destroy()
+                    data.distLabel = nil
+                end
+                
+                if espHP and data.hpBar then
+                    data.hpBar.Size = UDim2.new(hpPercent, 0, 0.2, 0)
+                    data.hpBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 0)
+                elseif espHP and not data.hpBar then
+                    data.hpBar = Instance.new("Frame")
+                    data.hpBar.Size = UDim2.new(hpPercent, 0, 0.2, 0)
+                    data.hpBar.Position = UDim2.new(0,0,0.8,0)
+                    data.hpBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 0)
+                    data.hpBar.BorderSizePixel = 0
+                    data.hpBar.Parent = data.frame
+                elseif not espHP and data.hpBar then
+                    data.hpBar:Destroy()
+                    data.hpBar = nil
+                end
+            end
+        elseif espObjects[plr.Character] then
+            espObjects[plr.Character].bill:Destroy()
+            espObjects[plr.Character] = nil
+        end
+    end
+    
+    if espChestEnabled then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name:lower():find("chest") or obj.Name:lower():find("treasure") or obj.Name:lower():find("crate") or obj.Name:lower():find("suitcase")) then
+                if not espObjects[obj] then
+                    createESP(obj, Color3.fromRGB(255,165,0), obj.Name)
+                elseif espObjects[obj].bill then
+                    espObjects[obj].bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
+                end
+            end
+        end
+    end
+    
+    if espMobEnabled then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(obj) then
+                if not espObjects[obj] then
+                    createESP(obj, Color3.fromRGB(0,255,0), obj.Name)
+                elseif espObjects[obj].bill then
+                    espObjects[obj].bill.Size = UDim2.new(0, math.floor(4 * espSize), 0, math.floor(3 * espSize))
+                end
+            end
+        end
+    end
+end
+
+function startESP()
+    if espConnection then espConnection:Disconnect() end
+    espConnection = RunService.RenderStepped:Connect(updateESP)
+end
+
+function stopESP()
+    if espConnection then espConnection:Disconnect() end
+    for obj, data in pairs(espObjects) do
+        if data.bill then data.bill:Destroy() end
+    end
+    espObjects = {}
+end
+
+screenGui.Parent = CoreGui
+screenGui.Name = "VanezyScriptGUI"
+createMainUI()
+createLoadingScreen()
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if flyEnabled then toggleFly() end
+    if noclipEnabled then toggleNoclip() end
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = autoRun and autoRunSpeed or (speedHack and speedValue or walkSpeedValue)
+        player.Character.Humanoid.JumpPower = jumpPower
+    end
+end)
+
+print("Vanezy Universal Script v1.0 FULL загружен")
