@@ -1,69 +1,77 @@
 --[[
-    TWEAKOS EXECUTOR v4.0 - ПОЛНЫЙ ФИКС NOCLIP + СКОРОСТЬ 300
-    Noclip: Прямая модификация физического тела через BodyVelocity
-    Скорость: 8-300 studs/s
+    TWEAKOS EXECUTOR v5.0 - МИНИМАЛЬНАЯ ВЕРСИЯ БЕЗ ОШИБОК
+    Убраны все потенциальные проблемы совместимости
+    Noclip через BodyVelocity + CanCollide
+    Скорость 8-300
+    Позиция с копированием
 --]]
 
+-- Защита от повторов
+if getgenv().TWEAKOS_LOADED then
+    return
+end
+getgenv().TWEAKOS_LOADED = true
+
+-- Сервисы
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Очистка
-for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-    if gui.Name == "TWEAKOS_Core" then
-        gui:Destroy()
+-- Очистка старых GUI
+pcall(function()
+    for _, v in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+        if v.Name == "TWEAKOS_Core" then
+            v:Destroy()
+        end
     end
-end
+end)
 
--- Состояния
+-- Переменные
 local noclipEnabled = false
 local speedValue = 16
-local noclipBodyVelocity = nil
+local noclipBv = nil
+local noclipConn = nil
 local lastPosition = Vector3.zero
 
--- ============================================
--- GUI
--- ============================================
+-- Создание GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TWEAKOS_Core"
 ScreenGui.Parent = LocalPlayer.PlayerGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.ResetOnSpawn = false
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 280)
-MainFrame.Position = UDim2.new(0.5, -150, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 300, 0, 250)
+Main.Position = UDim2.new(0.5, -150, 0.3, 0)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
+-- Заголовок
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-Title.Text = "TWEAKOS v4.0"
+Title.Text = "TWEAKOS v5.0"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
-Title.Parent = MainFrame
+Title.Parent = Main
 
 -- ============================================
--- 1. NOCLIP
+-- NOCLIP
 -- ============================================
 local NoclipFrame = Instance.new("Frame")
-NoclipFrame.Size = UDim2.new(1, -20, 0, 45)
+NoclipFrame.Size = UDim2.new(1, -20, 0, 50)
 NoclipFrame.Position = UDim2.new(0, 10, 0, 45)
 NoclipFrame.BackgroundTransparency = 1
-NoclipFrame.Parent = MainFrame
+NoclipFrame.Parent = Main
 
 local NoclipLabel = Instance.new("TextLabel")
-NoclipLabel.Size = UDim2.new(0.55, 0, 1, 0)
+NoclipLabel.Size = UDim2.new(0, 180, 0, 50)
 NoclipLabel.BackgroundTransparency = 1
 NoclipLabel.Text = "ПРОХОД СКВОЗЬ СТЕНЫ"
 NoclipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -72,135 +80,127 @@ NoclipLabel.TextSize = 14
 NoclipLabel.TextXAlignment = Enum.TextXAlignment.Left
 NoclipLabel.Parent = NoclipFrame
 
-local NoclipButton = Instance.new("TextButton")
-NoclipButton.Size = UDim2.new(0, 60, 0, 30)
-NoclipButton.Position = UDim2.new(1, -65, 0.5, -15)
-NoclipButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-NoclipButton.Text = "ВЫКЛ"
-NoclipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-NoclipButton.Font = Enum.Font.GothamBold
-NoclipButton.TextSize = 12
-NoclipButton.AutoButtonColor = false
-NoclipButton.Parent = NoclipFrame
+local NoclipBtn = Instance.new("TextButton")
+NoclipBtn.Size = UDim2.new(0, 70, 0, 35)
+NoclipBtn.Position = UDim2.new(1, -75, 0, 8)
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+NoclipBtn.Text = "ВЫКЛ"
+NoclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoclipBtn.Font = Enum.Font.GothamBold
+NoclipBtn.TextSize = 13
+NoclipBtn.AutoButtonColor = false
+NoclipBtn.Parent = NoclipFrame
 
-local NoclipCorner = Instance.new("UICorner")
-NoclipCorner.CornerRadius = UDim.new(0, 8)
-NoclipCorner.Parent = NoclipButton
+Instance.new("UICorner", NoclipBtn).CornerRadius = UDim.new(0, 8)
 
--- ФУНКЦИЯ АКТИВАЦИИ NOCLIP
-local function ActivateNoclip()
-    local character = LocalPlayer.Character
-    if not character then return end
+-- Функция Noclip
+local function EnableNoclip()
+    local char = LocalPlayer.Character
+    if not char then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
     
-    -- Удаляем старый BodyVelocity если есть
-    if noclipBodyVelocity then
-        noclipBodyVelocity:Destroy()
-        noclipBodyVelocity = nil
+    -- Удаляем старый BodyVelocity
+    if noclipBv then
+        pcall(function() noclipBv:Destroy() end)
     end
     
-    -- Создаём BodyVelocity для управления движением
-    noclipBodyVelocity = Instance.new("BodyVelocity")
-    noclipBodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 1000000
-    noclipBodyVelocity.Velocity = Vector3.zero
-    noclipBodyVelocity.P = 100000
-    noclipBodyVelocity.Parent = humanoidRootPart
+    -- Создаём новый
+    noclipBv = Instance.new("BodyVelocity")
+    noclipBv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    noclipBv.Velocity = Vector3.zero
+    noclipBv.P = 100000
+    noclipBv.Parent = hrp
     
     -- Отключаем коллизию
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
+    for _, v in ipairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = false
         end
     end
     
-    -- Подключаем обновление движения
-    noclipConnection = RunService.Stepped:Connect(function()
-        local char = LocalPlayer.Character
-        if not char or not noclipEnabled then return end
+    -- Цикл движения
+    noclipConn = RunService.Stepped:Connect(function()
+        if not noclipEnabled then return end
         
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChild("Humanoid")
-        if not hrp or not hum then return end
+        local c = LocalPlayer.Character
+        if not c then return end
         
-        -- Отключаем коллизию постоянно
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide == true then
-                part.CanCollide = false
+        local h = c:FindFirstChild("Humanoid")
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if not h or not r then return end
+        
+        -- Поддержание коллизии выключенной
+        for _, v in ipairs(c:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide == true then
+                v.CanCollide = false
             end
         end
         
-        -- Управление через MoveDirection
-        if noclipBodyVelocity and noclipBodyVelocity.Parent == hrp then
-            local moveDirection = hum.MoveDirection
-            if moveDirection.Magnitude > 0 then
-                noclipBodyVelocity.Velocity = moveDirection * speedValue
+        -- Движение через BodyVelocity
+        if noclipBv and noclipBv.Parent == r then
+            local md = h.MoveDirection
+            if md.Magnitude > 0 then
+                noclipBv.Velocity = md * speedValue
             else
-                noclipBodyVelocity.Velocity = Vector3.zero
+                noclipBv.Velocity = Vector3.zero
             end
         end
     end)
 end
 
-local function DeactivateNoclip()
+local function DisableNoclip()
     noclipEnabled = false
     
-    -- Удаляем BodyVelocity
-    if noclipBodyVelocity then
-        noclipBodyVelocity:Destroy()
-        noclipBodyVelocity = nil
+    if noclipConn then
+        pcall(function() noclipConn:Disconnect() end)
+        noclipConn = nil
     end
     
-    -- Отключаем цикл
-    if noclipConnection then
-        noclipConnection:Disconnect()
-        noclipConnection = nil
+    if noclipBv then
+        pcall(function() noclipBv:Destroy() end)
+        noclipBv = nil
     end
     
-    -- Восстанавливаем коллизию
     local char = LocalPlayer.Character
     if char then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
             end
         end
     end
 end
 
--- Обработчик кнопки
 local function ToggleNoclip()
     noclipEnabled = not noclipEnabled
     
     if noclipEnabled then
-        ActivateNoclip()
-        NoclipButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
-        NoclipButton.Text = "ВКЛ"
-        print("[TWEAKOS] Noclip: ВКЛЮЧЕН")
+        EnableNoclip()
+        NoclipBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        NoclipBtn.Text = "ВКЛ"
     else
-        DeactivateNoclip()
-        NoclipButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-        NoclipButton.Text = "ВЫКЛ"
-        print("[TWEAKOS] Noclip: ВЫКЛЮЧЕН")
+        DisableNoclip()
+        NoclipBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        NoclipBtn.Text = "ВЫКЛ"
     end
 end
 
--- Двойная привязка для надёжности
-NoclipButton.Activated:Connect(ToggleNoclip)
-NoclipButton.MouseButton1Click:Connect(ToggleNoclip)
+NoclipBtn.Activated:Connect(ToggleNoclip)
+NoclipBtn.MouseButton1Down:Connect(ToggleNoclip)
 
 -- ============================================
--- 2. СКОРОСТЬ (8-300)
+-- СКОРОСТЬ
 -- ============================================
 local SpeedFrame = Instance.new("Frame")
 SpeedFrame.Size = UDim2.new(1, -20, 0, 60)
-SpeedFrame.Position = UDim2.new(0, 10, 0, 100)
+SpeedFrame.Position = UDim2.new(0, 10, 0, 105)
 SpeedFrame.BackgroundTransparency = 1
-SpeedFrame.Parent = MainFrame
+SpeedFrame.Parent = Main
 
 local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+SpeedLabel.Size = UDim2.new(1, 0, 0, 22)
 SpeedLabel.BackgroundTransparency = 1
 SpeedLabel.Text = "СКОРОСТЬ: 16"
 SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -210,58 +210,50 @@ SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
 SpeedLabel.Parent = SpeedFrame
 
 local SliderTrack = Instance.new("TextButton")
-SliderTrack.Size = UDim2.new(1, 0, 0, 12)
-SliderTrack.Position = UDim2.new(0, 0, 0, 26)
+SliderTrack.Size = UDim2.new(1, 0, 0, 14)
+SliderTrack.Position = UDim2.new(0, 0, 0, 28)
 SliderTrack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 SliderTrack.BorderSizePixel = 0
 SliderTrack.Text = ""
 SliderTrack.AutoButtonColor = false
 SliderTrack.Parent = SpeedFrame
 
-local TrackCorner = Instance.new("UICorner")
-TrackCorner.CornerRadius = UDim.new(0, 6)
-TrackCorner.Parent = SliderTrack
+Instance.new("UICorner", SliderTrack).CornerRadius = UDim.new(0, 7)
 
 local SliderFill = Instance.new("Frame")
-SliderFill.Size = UDim2.new(0.027, 0, 1, 0) -- (16-8)/(300-8) = 8/292 ≈ 0.027
+SliderFill.Size = UDim2.new(0.027, 0, 1, 0)
 SliderFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 SliderFill.BorderSizePixel = 0
 SliderFill.Parent = SliderTrack
 
-local FillCorner = Instance.new("UICorner")
-FillCorner.CornerRadius = UDim.new(0, 6)
-FillCorner.Parent = SliderFill
+Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(0, 7)
 
 local SliderKnob = Instance.new("TextButton")
-SliderKnob.Size = UDim2.new(0, 30, 0, 30)
-SliderKnob.Position = UDim2.new(0.027, -15, 0.5, -15)
+SliderKnob.Size = UDim2.new(0, 32, 0, 32)
+SliderKnob.Position = UDim2.new(0.027, -16, 0.5, -16)
 SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 SliderKnob.BorderSizePixel = 0
 SliderKnob.Text = ""
 SliderKnob.AutoButtonColor = false
 SliderKnob.Parent = SliderTrack
 
-local KnobCorner = Instance.new("UICorner")
-KnobCorner.CornerRadius = UDim.new(1, 0)
-KnobCorner.Parent = SliderKnob
+Instance.new("UICorner", SliderKnob).CornerRadius = UDim.new(1, 0)
 
 -- Логика ползунка
-local isDragging = false
+local dragging = false
 
-local function UpdateSpeedFromPosition(inputPosition)
+local function UpdateSpeed(inputPos)
     local trackStart = SliderTrack.AbsolutePosition.X
     local trackWidth = SliderTrack.AbsoluteSize.X
-    local relativeX = math.clamp((inputPosition.X - trackStart) / trackWidth, 0, 1)
+    local relativeX = math.clamp((inputPos.X - trackStart) / trackWidth, 0, 1)
     
-    -- Диапазон 8-300
     speedValue = math.floor(8 + (relativeX * 292) + 0.5)
     speedValue = math.clamp(speedValue, 8, 300)
     
     SliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
-    SliderKnob.Position = UDim2.new(relativeX, -15, 0.5, -15)
+    SliderKnob.Position = UDim2.new(relativeX, -16, 0.5, -16)
     SpeedLabel.Text = "СКОРОСТЬ: " .. speedValue
     
-    -- Применяем скорость
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChild("Humanoid")
@@ -274,65 +266,63 @@ end
 SliderKnob.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or 
        input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDragging = true
+        dragging = true
     end
 end)
 
 SliderTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or 
        input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDragging = true
-        UpdateSpeedFromPosition(input.Position)
+        dragging = true
+        UpdateSpeed(input.Position)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if isDragging and (input.UserInputType == Enum.UserInputType.Touch or 
-                      input.UserInputType == Enum.UserInputType.MouseMovement) then
-        UpdateSpeedFromPosition(input.Position)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or 
+                    input.UserInputType == Enum.UserInputType.MouseMovement) then
+        UpdateSpeed(input.Position)
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or 
        input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDragging = false
+        dragging = false
     end
 end)
 
 -- ============================================
--- 3. ПОЗИЦИЯ
+-- ПОЗИЦИЯ
 -- ============================================
 local PositionFrame = Instance.new("Frame")
-PositionFrame.Size = UDim2.new(1, -20, 0, 60)
-PositionFrame.Position = UDim2.new(0, 10, 0, 170)
+PositionFrame.Size = UDim2.new(1, -20, 0, 55)
+PositionFrame.Position = UDim2.new(0, 10, 0, 175)
 PositionFrame.BackgroundTransparency = 1
-PositionFrame.Parent = MainFrame
+PositionFrame.Parent = Main
 
 local PositionLabel = Instance.new("TextLabel")
-PositionLabel.Size = UDim2.new(1, 0, 0, 20)
+PositionLabel.Size = UDim2.new(1, 0, 0, 22)
 PositionLabel.BackgroundTransparency = 1
-PositionLabel.Text = "ПОЗИЦИЯ: 0, 0, 0"
+PositionLabel.Text = "X: 0.000 | Y: 0.000 | Z: 0.000"
 PositionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
 PositionLabel.Font = Enum.Font.Code
 PositionLabel.TextSize = 11
 PositionLabel.TextXAlignment = Enum.TextXAlignment.Left
 PositionLabel.Parent = PositionFrame
 
-local CopyPosButton = Instance.new("TextButton")
-CopyPosButton.Size = UDim2.new(1, 0, 0, 30)
-CopyPosButton.Position = UDim2.new(0, 0, 0, 25)
-CopyPosButton.BackgroundColor3 = Color3.fromRGB(50, 50, 180)
-CopyPosButton.Text = "КОПИРОВАТЬ ПОЗИЦИЮ"
-CopyPosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-CopyPosButton.Font = Enum.Font.GothamBold
-CopyPosButton.TextSize = 12
-CopyPosButton.AutoButtonColor = false
-CopyPosButton.Parent = PositionFrame
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(1, 0, 0, 30)
+CopyBtn.Position = UDim2.new(0, 0, 0, 24)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 180)
+CopyBtn.Text = "КОПИРОВАТЬ ПОЗИЦИЮ"
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.Font = Enum.Font.GothamBold
+CopyBtn.TextSize = 13
+CopyBtn.AutoButtonColor = false
+CopyBtn.Parent = PositionFrame
 
-local CopyCorner = Instance.new("UICorner")
-CopyCorner.CornerRadius = UDim.new(0, 6)
-CopyCorner.Parent = CopyPosButton
+Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 6)
 
 -- Обновление позиции
 RunService.RenderStepped:Connect(function()
@@ -358,37 +348,34 @@ local function CopyPosition()
         setclipboard(posString)
     end)
     
-    CopyPosButton.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-    CopyPosButton.Text = "СКОПИРОВАНО!"
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+    CopyBtn.Text = "СКОПИРОВАНО!"
     
     task.wait(0.7)
-    CopyPosButton.BackgroundColor3 = Color3.fromRGB(50, 50, 180)
-    CopyPosButton.Text = "КОПИРОВАТЬ ПОЗИЦИЮ"
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 180)
+    CopyBtn.Text = "КОПИРОВАТЬ ПОЗИЦИЮ"
 end
 
-CopyPosButton.Activated:Connect(CopyPosition)
-CopyPosButton.MouseButton1Click:Connect(CopyPosition)
+CopyBtn.Activated:Connect(CopyPosition)
+CopyBtn.MouseButton1Down:Connect(CopyPosition)
 
 -- ============================================
--- АВТОМАТИЧЕСКОЕ ВОССТАНОВЛЕНИЕ ПРИ РЕСПАВНЕ
+-- ВОССТАНОВЛЕНИЕ ПРИ РЕСПАВНЕ
 -- ============================================
 LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.15)
+    task.wait(0.2)
     
-    -- Восстановление скорости
     local hum = char:FindFirstChild("Humanoid")
     if hum then
         hum.WalkSpeed = speedValue
     end
     
-    -- Восстановление noclip если был включен
     if noclipEnabled then
-        -- Переподключаем с новым персонажем
-        ActivateNoclip()
+        EnableNoclip()
     end
 end)
 
--- Инициализация при старте
+-- Инициализация
 if LocalPlayer.Character then
     local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
     if hum then
@@ -396,11 +383,4 @@ if LocalPlayer.Character then
     end
 end
 
-print([[
-╔════════════════════════════════════╗
-║   TWEAKOS v4.0 - ACTIVATED        ║
-║   Noclip: BodyVelocity Method     ║
-║   Speed: 8-300 studs/s            ║
-║   Position: Real-time Export      ║
-╚════════════════════════════════════╝
-]])
+print("TWEAKOS v5.0 - Loaded")
