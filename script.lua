@@ -1,7 +1,9 @@
 --[[
-    Mobile Roblox Executor - Floating Mini Menu + Noclip + Speed
-    Сенсорное управление, копирование позиции, проход через стены, ускорение
-    Совместимость: Hydrogen, Arceus X, Fluxus Android, Delta Executor
+    Mobile Roblox Executor - PosGetter+ PRO (Noclip Toggle + Speed Slider)
+    - Копирование ТОЛЬКО координат (X, Y, Z) через запятую или пробел
+    - Ползунок регулировки скорости
+    - Кнопка Noclip (вкл/выкл)
+    - Сенсорное управление
 --]]
 
 local Players = game:GetService("Players")
@@ -12,13 +14,15 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Конфигурация
 local MenuConfig = {
-    Position = UDim2.new(0.85, 0, 0.15, 0),
-    Size = UDim2.new(0, 160, 0, 260),
-    Color = Color3.fromRGB(25, 25, 35),
-    TextColor = Color3.fromRGB(255, 255, 255),
-    AccentColor = Color3.fromRGB(66, 135, 245),
+    Position = UDim2.new(0.85, 0, 0.12, 0),
+    Size = UDim2.new(0, 180, 0, 310),
+    Color = Color3.fromRGB(20, 20, 30),
+    TextColor = Color3.fromRGB(240, 240, 255),
+    AccentColor = Color3.fromRGB(80, 100, 255),
     DangerColor = Color3.fromRGB(220, 50, 50),
-    SpeedColor = Color3.fromRGB(50, 220, 150)
+    DangerOnColor = Color3.fromRGB(255, 60, 60),
+    SpeedColor = Color3.fromRGB(50, 200, 150),
+    SliderColor = Color3.fromRGB(100, 100, 140)
 }
 
 -- Состояния
@@ -31,7 +35,7 @@ local Humanoid = nil
 
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "PosGetterMenu"
+ScreenGui.Name = "PosGetterPro"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
@@ -40,7 +44,7 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = MenuConfig.Color
-MainFrame.BackgroundTransparency = 0.08
+MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = MenuConfig.Position
 MainFrame.Size = MenuConfig.Size
@@ -48,56 +52,73 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.CornerRadius = UDim.new(0, 14)
 UICorner.Parent = MainFrame
 
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 1
-UIStroke.Color = Color3.fromRGB(100, 100, 120)
-UIStroke.Transparency = 0.7
+UIStroke.Color = Color3.fromRGB(100, 100, 130)
+UIStroke.Transparency = 0.6
 UIStroke.Parent = MainFrame
 
 -- Заголовок
 local TitleBar = Instance.new("Frame")
 TitleBar.Parent = MainFrame
 TitleBar.BackgroundColor3 = MenuConfig.AccentColor
-TitleBar.BackgroundTransparency = 0.15
-TitleBar.Size = UDim2.new(1, 0, 0, 32)
+TitleBar.BackgroundTransparency = 0.2
+TitleBar.Size = UDim2.new(1, 0, 0, 34)
 TitleBar.Position = UDim2.new(0, 0, 0, 0)
 
 local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.CornerRadius = UDim.new(0, 14)
 TitleCorner.Parent = TitleBar
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Parent = TitleBar
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Size = UDim2.new(1, -30, 1, 0)
+TitleLabel.Size = UDim2.new(1, -35, 1, 0)
 TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.Text = "🔧 PosGetter+"
+TitleLabel.Text = "🔧 PosGetter+ PRO"
 TitleLabel.TextColor3 = MenuConfig.TextColor
-TitleLabel.TextSize = 14
+TitleLabel.TextSize = 13
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = TitleBar
-CloseBtn.Size = UDim2.new(0, 30, 1, 0)
-CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.Size = UDim2.new(0, 35, 1, 0)
+CloseBtn.Position = UDim2.new(1, -35, 0, 0)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = MenuConfig.TextColor
-CloseBtn.TextSize = 16
+CloseBtn.TextSize = 18
 CloseBtn.Font = Enum.Font.GothamBold
 
--- Кнопка позиции
+-- === БЛОК ПОЗИЦИИ ===
+local PosSection = Instance.new("Frame")
+PosSection.Parent = MainFrame
+PosSection.Size = UDim2.new(0.9, 0, 0, 90)
+PosSection.Position = UDim2.new(0.05, 0, 0, 44)
+PosSection.BackgroundTransparency = 1
+
+local SectionLabel = Instance.new("TextLabel")
+SectionLabel.Parent = PosSection
+SectionLabel.Size = UDim2.new(1, 0, 0, 18)
+SectionLabel.Position = UDim2.new(0, 0, 0, 0)
+SectionLabel.BackgroundTransparency = 1
+SectionLabel.Text = "📍 ПОЗИЦИЯ"
+SectionLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+SectionLabel.TextSize = 10
+SectionLabel.Font = Enum.Font.GothamBold
+SectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 local GetPosBtn = Instance.new("TextButton")
-GetPosBtn.Parent = MainFrame
-GetPosBtn.Size = UDim2.new(0.85, 0, 0, 38)
-GetPosBtn.Position = UDim2.new(0.075, 0, 0, 42)
+GetPosBtn.Parent = PosSection
+GetPosBtn.Size = UDim2.new(1, 0, 0, 30)
+GetPosBtn.Position = UDim2.new(0, 0, 0, 20)
 GetPosBtn.BackgroundColor3 = MenuConfig.AccentColor
-GetPosBtn.BackgroundTransparency = 0.2
-GetPosBtn.Text = "📍 Получить позицию"
+GetPosBtn.BackgroundTransparency = 0.25
+GetPosBtn.Text = "📌 Получить позицию"
 GetPosBtn.TextColor3 = MenuConfig.TextColor
 GetPosBtn.TextSize = 12
 GetPosBtn.Font = Enum.Font.GothamSemibold
@@ -106,14 +127,13 @@ local BtnCorner = Instance.new("UICorner")
 BtnCorner.CornerRadius = UDim.new(0, 8)
 BtnCorner.Parent = GetPosBtn
 
--- Поле вывода
 local PosDisplay = Instance.new("TextBox")
-PosDisplay.Parent = MainFrame
-PosDisplay.Size = UDim2.new(0.85, 0, 0, 32)
-PosDisplay.Position = UDim2.new(0.075, 0, 0, 88)
-PosDisplay.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
-PosDisplay.BackgroundTransparency = 0.3
-PosDisplay.Text = "X: 0, Y: 0, Z: 0"
+PosDisplay.Parent = PosSection
+PosDisplay.Size = UDim2.new(0.7, 0, 0, 28)
+PosDisplay.Position = UDim2.new(0, 0, 0, 55)
+PosDisplay.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+PosDisplay.BackgroundTransparency = 0.4
+PosDisplay.Text = "0.00, 0.00, 0.00"
 PosDisplay.TextColor3 = MenuConfig.TextColor
 PosDisplay.TextSize = 10
 PosDisplay.Font = Enum.Font.Code
@@ -124,37 +144,45 @@ local DisplayCorner = Instance.new("UICorner")
 DisplayCorner.CornerRadius = UDim.new(0, 6)
 DisplayCorner.Parent = PosDisplay
 
--- Кнопка копирования
 local CopyBtn = Instance.new("TextButton")
-CopyBtn.Parent = MainFrame
-CopyBtn.Size = UDim2.new(0.85, 0, 0, 32)
-CopyBtn.Position = UDim2.new(0.075, 0, 0, 128)
-CopyBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+CopyBtn.Parent = PosSection
+CopyBtn.Size = UDim2.new(0.25, 0, 0, 28)
+CopyBtn.Position = UDim2.new(0.73, 0, 0, 55)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
 CopyBtn.Text = "📋 Копировать"
 CopyBtn.TextColor3 = MenuConfig.TextColor
-CopyBtn.TextSize = 11
+CopyBtn.TextSize = 10
 CopyBtn.Font = Enum.Font.Gotham
 
 local CopyCorner = Instance.new("UICorner")
 CopyCorner.CornerRadius = UDim.new(0, 6)
 CopyCorner.Parent = CopyBtn
 
--- Разделитель
-local Divider = Instance.new("Frame")
-Divider.Parent = MainFrame
-Divider.Size = UDim2.new(0.85, 0, 0, 1)
-Divider.Position = UDim2.new(0.075, 0, 0, 170)
-Divider.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-Divider.BackgroundTransparency = 0.5
+-- === БЛОК NOCLIP ===
+local NoclipSection = Instance.new("Frame")
+NoclipSection.Parent = MainFrame
+NoclipSection.Size = UDim2.new(0.9, 0, 0, 60)
+NoclipSection.Position = UDim2.new(0.05, 0, 0, 142)
+NoclipSection.BackgroundTransparency = 1
 
--- Кнопка Noclip
+local NoclipLabel = Instance.new("TextLabel")
+NoclipLabel.Parent = NoclipSection
+NoclipLabel.Size = UDim2.new(1, 0, 0, 18)
+NoclipLabel.Position = UDim2.new(0, 0, 0, 0)
+NoclipLabel.BackgroundTransparency = 1
+NoclipLabel.Text = "🚪 ПРОХОД СКВОЗЬ СТЕНЫ"
+NoclipLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+NoclipLabel.TextSize = 10
+NoclipLabel.Font = Enum.Font.GothamBold
+NoclipLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 local NoclipBtn = Instance.new("TextButton")
-NoclipBtn.Parent = MainFrame
-NoclipBtn.Size = UDim2.new(0.85, 0, 0, 36)
-NoclipBtn.Position = UDim2.new(0.075, 0, 0, 182)
+NoclipBtn.Parent = NoclipSection
+NoclipBtn.Size = UDim2.new(1, 0, 0, 34)
+NoclipBtn.Position = UDim2.new(0, 0, 0, 22)
 NoclipBtn.BackgroundColor3 = MenuConfig.DangerColor
 NoclipBtn.BackgroundTransparency = 0.3
-NoclipBtn.Text = "🚪 NOCLIP: ВЫКЛ"
+NoclipBtn.Text = "❌ NOCLIP: ВЫКЛ"
 NoclipBtn.TextColor3 = MenuConfig.TextColor
 NoclipBtn.TextSize = 12
 NoclipBtn.Font = Enum.Font.GothamBold
@@ -163,44 +191,126 @@ local NoclipCorner = Instance.new("UICorner")
 NoclipCorner.CornerRadius = UDim.new(0, 8)
 NoclipCorner.Parent = NoclipBtn
 
--- Кнопка Speed
-local SpeedBtn = Instance.new("TextButton")
-SpeedBtn.Parent = MainFrame
-SpeedBtn.Size = UDim2.new(0.85, 0, 0, 36)
-SpeedBtn.Position = UDim2.new(0.075, 0, 0, 226)
-SpeedBtn.BackgroundColor3 = MenuConfig.SpeedColor
-SpeedBtn.BackgroundTransparency = 0.3
-SpeedBtn.Text = "⚡ SPEED: ВЫКЛ (50)"
-SpeedBtn.TextColor3 = MenuConfig.TextColor
-SpeedBtn.TextSize = 11
-SpeedBtn.Font = Enum.Font.GothamBold
+-- === БЛОК SPEED С ПОЛЗУНКОМ ===
+local SpeedSection = Instance.new("Frame")
+SpeedSection.Parent = MainFrame
+SpeedSection.Size = UDim2.new(0.9, 0, 0, 85)
+SpeedSection.Position = UDim2.new(0.05, 0, 0, 210)
+SpeedSection.BackgroundTransparency = 1
 
-local SpeedCorner = Instance.new("UICorner")
-SpeedCorner.CornerRadius = UDim.new(0, 8)
-SpeedCorner.Parent = SpeedBtn
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Parent = SpeedSection
+SpeedLabel.Size = UDim2.new(1, 0, 0, 18)
+SpeedLabel.Position = UDim2.new(0, 0, 0, 0)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "⚡ БЫСТРЫЙ ХАК (СПИЗДЗАК)"
+SpeedLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+SpeedLabel.TextSize = 10
+SpeedLabel.Font = Enum.Font.GothamBold
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Кнопка вкл/выкл скорости
+local SpeedToggleBtn = Instance.new("TextButton")
+SpeedToggleBtn.Parent = SpeedSection
+SpeedToggleBtn.Size = UDim2.new(0.48, 0, 0, 34)
+SpeedToggleBtn.Position = UDim2.new(0, 0, 0, 22)
+SpeedToggleBtn.BackgroundColor3 = MenuConfig.SpeedColor
+SpeedToggleBtn.BackgroundTransparency = 0.3
+SpeedToggleBtn.Text = "⚡ ВЫКЛ"
+SpeedToggleBtn.TextColor3 = MenuConfig.TextColor
+SpeedToggleBtn.TextSize = 11
+SpeedToggleBtn.Font = Enum.Font.GothamBold
+
+local SpeedToggleCorner = Instance.new("UICorner")
+SpeedToggleCorner.CornerRadius = UDim.new(0, 8)
+SpeedToggleCorner.Parent = SpeedToggleBtn
+
+-- Ползунок скорости
+local SpeedSliderFrame = Instance.new("Frame")
+SpeedSliderFrame.Parent = SpeedSection
+SpeedSliderFrame.Size = UDim2.new(0.48, 0, 0, 34)
+SpeedSliderFrame.Position = UDim2.new(0.52, 0, 0, 22)
+SpeedSliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+SpeedSliderFrame.BackgroundTransparency = 0.3
+
+local SliderCorner = Instance.new("UICorner")
+SliderCorner.CornerRadius = UDim.new(0, 8)
+SliderCorner.Parent = SpeedSliderFrame
+
+-- Фон ползунка (трек)
+local SliderTrack = Instance.new("Frame")
+SliderTrack.Parent = SpeedSliderFrame
+SliderTrack.Size = UDim2.new(0.85, 0, 0, 4)
+SliderTrack.Position = UDim2.new(0.075, 0, 0.5, -2)
+SliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+SliderTrack.BorderSizePixel = 0
+
+local TrackCorner = Instance.new("UICorner")
+TrackCorner.CornerRadius = UDim.new(0, 2)
+TrackCorner.Parent = SliderTrack
+
+-- Заполненная часть ползунка
+local SliderFill = Instance.new("Frame")
+SliderFill.Parent = SliderTrack
+SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+SliderFill.BackgroundColor3 = MenuConfig.SpeedColor
+SliderFill.BorderSizePixel = 0
+
+local FillCorner = Instance.new("UICorner")
+FillCorner.CornerRadius = UDim.new(0, 2)
+FillCorner.Parent = SliderFill
+
+-- Круглый бегунок
+local SliderKnob = Instance.new("TextButton")
+SliderKnob.Parent = SpeedSliderFrame
+SliderKnob.Size = UDim2.new(0, 18, 0, 18)
+SliderKnob.Position = UDim2.new(0.5, -9, 0.5, -9)
+SliderKnob.BackgroundColor3 = MenuConfig.SpeedColor
+SliderKnob.Text = ""
+SliderKnob.AutoButtonColor = false
+
+local KnobCorner = Instance.new("UICorner")
+KnobCorner.CornerRadius = UDim.new(1, 0)
+KnobCorner.Parent = SliderKnob
+
+-- Значение скорости текстом
+local SpeedValueLabel = Instance.new("TextLabel")
+SpeedValueLabel.Parent = SpeedSection
+SpeedValueLabel.Size = UDim2.new(0.48, 0, 0, 18)
+SpeedValueLabel.Position = UDim2.new(0.52, 0, 0, 60)
+SpeedValueLabel.BackgroundTransparency = 1
+SpeedValueLabel.Text = "50"
+SpeedValueLabel.TextColor3 = MenuConfig.SpeedColor
+SpeedValueLabel.TextSize = 12
+SpeedValueLabel.Font = Enum.Font.GothamBold
 
 -- Статус
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Parent = MainFrame
-StatusLabel.Size = UDim2.new(0.85, 0, 0, 16)
-StatusLabel.Position = UDim2.new(0.075, 0, 1, -20)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 16)
+StatusLabel.Position = UDim2.new(0.05, 0, 1, -22)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Готов"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
 StatusLabel.TextSize = 9
 StatusLabel.Font = Enum.Font.Gotham
 
--- === ФУНКЦИИ NOCLIP ===
+-- === ЯДЕРНЫЕ ФУНКЦИИ ===
 local function UpdateCharacterReferences()
     Character = LocalPlayer.Character
     if Character then
         Humanoid = Character:FindFirstChild("Humanoid")
+        if Humanoid and not SpeedEnabled then
+            OriginalWalkspeed = Humanoid.WalkSpeed
+        end
     end
 end
 
-local function StartNoclip()
-    if not NoclipEnabled then return end
-    RunService.Stepped:Connect(function()
+-- Noclip
+local noclipConnection = nil
+local function StartNoclipLoop()
+    if noclipConnection then noclipConnection:Disconnect() end
+    noclipConnection = RunService.Stepped:Connect(function()
         if not NoclipEnabled then return end
         UpdateCharacterReferences()
         if Character then
@@ -215,8 +325,9 @@ end
 
 local function ToggleNoclip()
     NoclipEnabled = not NoclipEnabled
+    UpdateCharacterReferences()
+    
     if NoclipEnabled then
-        UpdateCharacterReferences()
         if Character then
             for _, part in pairs(Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -224,13 +335,12 @@ local function ToggleNoclip()
                 end
             end
         end
-        NoclipBtn.Text = "🚪 NOCLIP: ВКЛ"
-        NoclipBtn.BackgroundColor3 = MenuConfig.DangerColor
+        StartNoclipLoop()
+        NoclipBtn.Text = "✅ NOCLIP: ВКЛ"
+        NoclipBtn.BackgroundColor3 = MenuConfig.DangerOnColor
         NoclipBtn.BackgroundTransparency = 0
         StatusLabel.Text = "✓ Noclip активирован"
-        StartNoclip()
     else
-        UpdateCharacterReferences()
         if Character then
             for _, part in pairs(Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -238,85 +348,66 @@ local function ToggleNoclip()
                 end
             end
         end
-        NoclipBtn.Text = "🚪 NOCLIP: ВЫКЛ"
+        if noclipConnection then noclipConnection:Disconnect() end
+        NoclipBtn.Text = "❌ NOCLIP: ВЫКЛ"
+        NoclipBtn.BackgroundColor3 = MenuConfig.DangerColor
         NoclipBtn.BackgroundTransparency = 0.3
         StatusLabel.Text = "✗ Noclip деактивирован"
     end
-    StatusLabel.TextColor3 = NoclipEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-    task.wait(1.5)
+    StatusLabel.TextColor3 = NoclipEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 150, 150)
+    task.wait(1.2)
     StatusLabel.Text = "Готов"
-    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
 end
 
--- === ФУНКЦИИ SPEED ===
+-- Speed
 local function SetSpeed(value)
+    value = math.clamp(value, 16, 250)
+    CurrentSpeed = value
     UpdateCharacterReferences()
-    if Humanoid then
-        OriginalWalkspeed = Humanoid.WalkSpeed
+    if Humanoid and SpeedEnabled then
         Humanoid.WalkSpeed = value
     end
-end
-
-local function ResetSpeed()
-    UpdateCharacterReferences()
-    if Humanoid then
-        Humanoid.WalkSpeed = OriginalWalkspeed
+    SpeedValueLabel.Text = tostring(math.floor(value))
+    
+    -- Обновление ползунка UI
+    local percent = (value - 16) / (250 - 16)
+    local trackWidth = SliderTrack.AbsoluteSize.X
+    if trackWidth > 0 then
+        local knobPosX = percent * trackWidth
+        SliderFill.Size = UDim2.new(percent, 0, 1, 0)
+        SliderKnob.Position = UDim2.new(percent, -9, 0.5, -9)
     end
 end
 
 local function ToggleSpeed()
     SpeedEnabled = not SpeedEnabled
+    UpdateCharacterReferences()
+    
     if SpeedEnabled then
-        SetSpeed(CurrentSpeed)
-        SpeedBtn.Text = "⚡ SPEED: ВКЛ (" .. CurrentSpeed .. ")"
-        SpeedBtn.BackgroundTransparency = 0
+        if Humanoid then
+            OriginalWalkspeed = Humanoid.WalkSpeed
+            Humanoid.WalkSpeed = CurrentSpeed
+        end
+        SpeedToggleBtn.Text = "⚡ ВКЛ"
+        SpeedToggleBtn.BackgroundColor3 = MenuConfig.SpeedColor
+        SpeedToggleBtn.BackgroundTransparency = 0
         StatusLabel.Text = "✓ Скорость: " .. CurrentSpeed
     else
-        ResetSpeed()
-        SpeedBtn.Text = "⚡ SPEED: ВЫКЛ (" .. CurrentSpeed .. ")"
-        SpeedBtn.BackgroundTransparency = 0.3
+        if Humanoid then
+            Humanoid.WalkSpeed = OriginalWalkspeed
+        end
+        SpeedToggleBtn.Text = "⚡ ВЫКЛ"
+        SpeedToggleBtn.BackgroundTransparency = 0.3
         StatusLabel.Text = "✗ Скорость сброшена"
     end
-    StatusLabel.TextColor3 = SpeedEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-    task.wait(1.5)
+    StatusLabel.TextColor3 = SpeedEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 150, 150)
+    task.wait(1.2)
     StatusLabel.Text = "Готов"
-    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
 end
 
--- Изменение скорости (зажимание для увеличения)
-local SpeedAdjustActive = false
-local SpeedAdjustThread = nil
-
-local function StartSpeedAdjust(increase)
-    SpeedAdjustActive = true
-    SpeedAdjustThread = task.spawn(function()
-        while SpeedAdjustActive do
-            if increase then
-                CurrentSpeed = math.min(CurrentSpeed + 5, 250)
-            else
-                CurrentSpeed = math.max(CurrentSpeed - 5, 16)
-            end
-            if SpeedEnabled then
-                SetSpeed(CurrentSpeed)
-            end
-            SpeedBtn.Text = (SpeedEnabled and "⚡ SPEED: ВКЛ (" or "⚡ SPEED: ВЫКЛ (") .. CurrentSpeed .. ")"
-            StatusLabel.Text = "⚡ Скорость: " .. CurrentSpeed
-            task.wait(0.15)
-        end
-    end)
-end
-
-local function StopSpeedAdjust()
-    SpeedAdjustActive = false
-    if SpeedAdjustThread then
-        task.cancel(SpeedAdjustThread)
-    end
-    StatusLabel.Text = "Готов"
-    task.wait(1)
-    StatusLabel.Text = "Готов"
-end
-
--- === ОСТАЛЬНЫЕ ФУНКЦИИ ===
+-- === ПОЗИЦИЯ (КОПИРУЕТ ТОЛЬКО ЦИФРЫ) ===
 local function GetPlayerPosition()
     UpdateCharacterReferences()
     if not Character or not Character.Parent then
@@ -333,29 +424,46 @@ local function GetPlayerPosition()
     return nil
 end
 
-local function FormatPosition(pos)
-    if not pos then return "Персонаж не найден" end
-    return string.format("X: %.1f, Y: %.1f, Z: %.1f", pos.X, pos.Y, pos.Z)
+-- Форматирование ТОЛЬКО координат (без Vector3, без лишнего)
+local function FormatPositionRaw(pos)
+    if not pos then return "0, 0, 0" end
+    return string.format("%.2f, %.2f, %.2f", pos.X, pos.Y, pos.Z)
 end
 
-local function FormatVector3Lua(pos)
-    if not pos then return "nil" end
-    return string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)
+local function FormatPositionSpaced(pos)
+    if not pos then return "0 0 0" end
+    return string.format("%.2f %.2f %.2f", pos.X, pos.Y, pos.Z)
 end
 
-local function UpdateDisplay()
+local function UpdateDisplayAndCopy(mode)
     local pos = GetPlayerPosition()
     if pos then
-        PosDisplay.Text = FormatPosition(pos)
-        StatusLabel.Text = "✓ Позиция обновлена"
-        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        task.wait(1.2)
+        local copyText = (mode == "spaced") and FormatPositionSpaced(pos) or FormatPositionRaw(pos)
+        PosDisplay.Text = FormatPositionRaw(pos)
+        
+        -- Копирование в буфер
+        local success = false
+        if setclipboard then setclipboard(copyText); success = true
+        elseif toclipboard then toclipboard(copyText); success = true
+        elseif writeclipboard then writeclipboard(copyText); success = true
+        elseif syn and syn.set_clipboard then syn.set_clipboard(copyText); success = true
+        elseif mobile and mobile.copy then mobile.copy(copyText); success = true
+        end
+        
+        if success then
+            StatusLabel.Text = "✓ Скопировано: " .. copyText
+            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            StatusLabel.Text = "⚠ Позиция: " .. copyText .. " (не скопировано)"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+        end
+        task.wait(1.5)
         StatusLabel.Text = "Готов"
-        StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
         return pos
     else
-        PosDisplay.Text = "Ошибка: персонаж не найден"
-        StatusLabel.Text = "✗ Ошибка"
+        PosDisplay.Text = "Ошибка"
+        StatusLabel.Text = "✗ Персонаж не найден"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         task.wait(1.2)
         StatusLabel.Text = "Готов"
@@ -363,64 +471,104 @@ local function UpdateDisplay()
     end
 end
 
-local function CopyToClipboard(text)
-    local success = false
-    if setclipboard then
-        setclipboard(text)
-        success = true
-    elseif toclipboard then
-        toclipboard(text)
-        success = true
-    elseif writeclipboard then
-        writeclipboard(text)
-        success = true
-    elseif syn and syn.set_clipboard then
-        syn.set_clipboard(text)
-        success = true
-    elseif mobile and mobile.copy then
-        mobile.copy(text)
-        success = true
-    end
-    
-    if success then
-        StatusLabel.Text = "✓ Скопировано: " .. text
+local function JustCopy()
+    local pos = GetPlayerPosition()
+    if pos then
+        local copyText = FormatPositionRaw(pos)
+        if setclipboard then setclipboard(copyText)
+        elseif toclipboard then toclipboard(copyText)
+        elseif writeclipboard then writeclipboard(copyText)
+        elseif syn and syn.set_clipboard then syn.set_clipboard(copyText)
+        elseif mobile and mobile.copy then mobile.copy(copyText)
+        end
+        StatusLabel.Text = "✓ " .. copyText
         StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
         task.wait(1)
+        StatusLabel.Text = "Готов"
     else
-        StatusLabel.Text = "✗ Буфер недоступен"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        task.wait(1.2)
+        StatusLabel.Text = "✗ Нет позиции"
     end
-    StatusLabel.Text = "Готов"
-    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 end
 
+local function UpdateDisplayOnly()
+    local pos = GetPlayerPosition()
+    if pos then
+        PosDisplay.Text = FormatPositionRaw(pos)
+    else
+        PosDisplay.Text = "Ошибка"
+    end
+end
+
+-- === ПОЛЗУНОК (СЕНСОРНЫЙ/МЫШЬ) ===
+local dragging = false
+local function UpdateSliderFromInput(inputPos)
+    local trackAbsPos = SliderTrack.AbsolutePosition
+    local trackWidth = SliderTrack.AbsoluteSize.X
+    if trackWidth <= 0 then return end
+    
+    local relativeX = math.clamp(inputPos.X - trackAbsPos.X, 0, trackWidth)
+    local percent = relativeX / trackWidth
+    local newSpeed = 16 + percent * (250 - 16)
+    newSpeed = math.clamp(newSpeed, 16, 250)
+    SetSpeed(newSpeed)
+    if SpeedEnabled then
+        UpdateCharacterReferences()
+        if Humanoid then Humanoid.WalkSpeed = CurrentSpeed end
+    end
+end
+
+SliderKnob.MouseButton1Down:Connect(function()
+    dragging = true
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                     input.UserInputType == Enum.UserInputType.Touch) then
+        UpdateSliderFromInput(input.Position)
+    end
+end)
+
+-- Сенсор для ползунка
+SliderKnob.TouchTap:Connect(function() end)
+SliderKnob.TouchMoved:Connect(function(touch)
+    UpdateSliderFromInput(touch.Position)
+end)
+
+SliderTrack.MouseButton1Down:Connect(function(x, y)
+    UpdateSliderFromInput(UserInputService:GetMouseLocation())
+end)
+
+SliderTrack.TouchTap:Connect(function(touch)
+    UpdateSliderFromInput(touch.Position)
+end)
+
+-- === ОБРАБОТЧИКИ КНОПОК ===
 local function AnimateButton(btn)
-    local originalSize = btn.Size
-    local tween = TweenService:Create(btn, TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-        {Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, originalSize.Y.Scale, originalSize.Y.Offset - 2)})
+    local origSize = btn.Size
+    local tween = TweenService:Create(btn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size = UDim2.new(origSize.X.Scale, origSize.X.Offset, origSize.Y.Scale, origSize.Y.Offset - 2)})
     tween:Play()
     tween.Completed:Connect(function()
-        local tween2 = TweenService:Create(btn, TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
-            {Size = originalSize})
-        tween2:Play()
+        TweenService:Create(btn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {Size = origSize}):Play()
     end)
 end
 
--- === ОБРАБОТЧИКИ ===
 GetPosBtn.MouseButton1Click:Connect(function()
     AnimateButton(GetPosBtn)
-    UpdateDisplay()
+    UpdateDisplayAndCopy("raw")
 end)
 
 CopyBtn.MouseButton1Click:Connect(function()
     AnimateButton(CopyBtn)
-    local pos = GetPlayerPosition()
-    if pos then
-        CopyToClipboard(FormatVector3Lua(pos))
-    else
-        CopyToClipboard(PosDisplay.Text)
-    end
+    JustCopy()
 end)
 
 NoclipBtn.MouseButton1Click:Connect(function()
@@ -428,55 +576,10 @@ NoclipBtn.MouseButton1Click:Connect(function()
     ToggleNoclip()
 end)
 
--- Долгое нажатие для сброса noclip (FULL RESET)
-local NoclipHoldThread = nil
-NoclipBtn.MouseButton1Down:Connect(function()
-    NoclipHoldThread = task.spawn(function()
-        task.wait(1.5)
-        if NoclipEnabled then
-            ToggleNoclip()
-            ToggleNoclip()
-            StatusLabel.Text = "🔄 Noclip перезагружен"
-        end
-    end)
+SpeedToggleBtn.MouseButton1Click:Connect(function()
+    AnimateButton(SpeedToggleBtn)
+    ToggleSpeed()
 end)
-NoclipBtn.MouseButton1Up:Connect(function()
-    if NoclipHoldThread then task.cancel(NoclipHoldThread) end
-end)
-
--- Speed кнопка: короткое нажатие = вкл/выкл, долгое = регулировка
-local SpeedHoldThread = nil
-local SpeedHoldActive = false
-
-SpeedBtn.MouseButton1Down:Connect(function()
-    SpeedHoldThread = task.spawn(function()
-        task.wait(0.5)
-        SpeedHoldActive = true
-        StartSpeedAdjust(true)
-    end)
-end)
-
-SpeedBtn.MouseButton1Up:Connect(function()
-    if SpeedHoldThread then 
-        task.cancel(SpeedHoldThread)
-        SpeedHoldThread = nil
-    end
-    if SpeedHoldActive then
-        StopSpeedAdjust()
-        SpeedHoldActive = false
-    else
-        ToggleSpeed()
-    end
-end)
-
--- Нажатие правой кнопкой/двумя пальцами = уменьшение скорости
-local function OnRightClick()
-    StartSpeedAdjust(false)
-    task.wait(1)
-    StopSpeedAdjust()
-end
-
-SpeedBtn.MouseButton2Click:Connect(OnRightClick)
 
 CloseBtn.MouseButton1Click:Connect(function()
     if NoclipEnabled then ToggleNoclip() end
@@ -484,58 +587,22 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Сенсорная поддержка
-local function SetupTouch(button, isSpeed)
-    button.TouchTap:Connect(function()
-        if button == GetPosBtn then
-            AnimateButton(GetPosBtn)
-            UpdateDisplay()
-        elseif button == CopyBtn then
-            AnimateButton(CopyBtn)
-            local pos = GetPlayerPosition()
-            if pos then
-                CopyToClipboard(FormatVector3Lua(pos))
-            end
-        elseif button == NoclipBtn then
-            AnimateButton(NoclipBtn)
-            ToggleNoclip()
-        elseif button == SpeedBtn then
-            ToggleSpeed()
-        elseif button == CloseBtn then
-            if NoclipEnabled then ToggleNoclip() end
-            if SpeedEnabled then ToggleSpeed() end
-            ScreenGui:Destroy()
-        end
-    end)
-    
-    if isSpeed then
-        button.TouchLongPress:Connect(function()
-            StartSpeedAdjust(true)
-            task.wait(2)
-            StopSpeedAdjust()
-        end)
-    end
-end
+-- Сенсорные прикосновения
+GetPosBtn.TouchTap:Connect(function() AnimateButton(GetPosBtn); UpdateDisplayAndCopy("raw") end)
+CopyBtn.TouchTap:Connect(function() AnimateButton(CopyBtn); JustCopy() end)
+NoclipBtn.TouchTap:Connect(function() AnimateButton(NoclipBtn); ToggleNoclip() end)
+SpeedToggleBtn.TouchTap:Connect(function() AnimateButton(SpeedToggleBtn); ToggleSpeed() end)
+CloseBtn.TouchTap:Connect(function() 
+    if NoclipEnabled then ToggleNoclip() end
+    if SpeedEnabled then ToggleSpeed() end
+    ScreenGui:Destroy() 
+end)
 
-SetupTouch(GetPosBtn, false)
-SetupTouch(CopyBtn, false)
-SetupTouch(NoclipBtn, false)
-SetupTouch(SpeedBtn, true)
-SetupTouch(CloseBtn, false)
-
--- Глобальные экспорты
-_G.GetPosition = GetPlayerPosition
-_G.GetPositionString = function() local pos = GetPlayerPosition() return pos and FormatVector3Lua(pos) or nil end
-_G.LastPlayerPosition = nil
-_G.ToggleNoclip = ToggleNoclip
-_G.ToggleSpeed = ToggleSpeed
-_G.SetSpeedValue = function(val) CurrentSpeed = math.clamp(val, 16, 250) if SpeedEnabled then SetSpeed(CurrentSpeed) end SpeedBtn.Text = (SpeedEnabled and "⚡ SPEED: ВКЛ (" or "⚡ SPEED: ВЫКЛ (") .. CurrentSpeed .. ")" end
-
--- Отслеживание респавна
+-- Сброс Noclip при респавне
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     Character = newChar
     Humanoid = newChar:FindFirstChild("Humanoid")
-    task.wait(0.5)
+    task.wait(0.3)
     if NoclipEnabled then
         for _, part in pairs(newChar:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -546,16 +613,29 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
     if SpeedEnabled and Humanoid then
         Humanoid.WalkSpeed = CurrentSpeed
     end
+    UpdateDisplayOnly()
 end)
+
+-- Инициализация ползунка
+SetSpeed(50)
+
+-- Глобальные экспорты
+_G.GetPosition = GetPlayerPosition
+_G.GetPositionRaw = function() local p = GetPlayerPosition() return p and string.format("%.2f,%.2f,%.2f", p.X, p.Y, p.Z) end
+_G.ToggleNoclip = ToggleNoclip
+_G.ToggleSpeed = ToggleSpeed
+_G.SetSpeed = SetSpeed
+_G.NoclipEnabled = false
+_G.SpeedEnabled = false
 
 -- Анимация появления
 MainFrame.BackgroundTransparency = 1
 for i = 1, 10 do
     MainFrame.BackgroundTransparency = 1 - (i * 0.09)
-    task.wait(0.02)
+    task.wait(0.015)
 end
 
-print("=== Mobile PosGetter+ Noclip/Speed Loaded ===")
-print("Noclip: нажмите кнопку для прохода сквозь стены")
-print("Speed: короткое нажатие - вкл/выкл, долгое нажатие - увеличение, правая кнопка/долгий тап - уменьшение")
-print("Доступ: _G.ToggleNoclip(), _G.ToggleSpeed(), _G.SetSpeedValue(число)")
+print("=== PosGetter+ PRO Loading ===")
+print("Копирует ТОЛЬКО: X, Y, Z")
+print("Noclip: кнопка вкл/выкл")
+print("Speed: ползунок регулировки + кнопка вкл/выкл")
