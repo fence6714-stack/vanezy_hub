@@ -28,6 +28,20 @@ if isAdmin then
 	print("✅ ADMIN MODE ACTIVATED! Welcome, " .. player.Name)
 end
 
+-- =========== СОЗДАНИЕ GUI (РАНЬШЕ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБОК) ===========
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SynapseHub"
+ScreenGui.ResetOnSpawn = false
+
+local playerGui = player:WaitForChild("PlayerGui")
+pcall(function()
+	ScreenGui.Parent = playerGui
+end)
+
+if not ScreenGui.Parent then
+	ScreenGui.Parent = playerGui
+end
+
 -- =========== ХРАНИЛИЩЕ ДЛЯ СТАТИСТИКИ ===========
 local StatsFolder = Instance.new("Folder")
 StatsFolder.Name = "ScriptStats"
@@ -111,6 +125,26 @@ local DEFAULT_SETTINGS = {
 
 local settings = {}
 
+-- =========== ЗАГРУЗКА СОХРАНЕНИЙ ===========
+local StorageValues = Instance.new("Folder")
+StorageValues.Name = "UISettings"
+StorageValues.Parent = player
+
+local function loadValue(name, default)
+	local val = StorageValues:GetAttribute(name)
+	if val ~= nil then return val end
+	return default
+end
+
+local function saveValue(name, value)
+	StorageValues:SetAttribute(name, value)
+end
+
+-- Загружаем настройки
+for key, default in pairs(DEFAULT_SETTINGS) do
+	settings[key] = loadValue(key, default)
+end
+
 -- =========== ФУНКЦИИ УВЕДОМЛЕНИЙ ===========
 local activeNotifications = {}
 local notificationContainer = nil
@@ -138,7 +172,7 @@ local function createNotification(text, duration)
 	notification.Parent = notificationContainer
 	
 	local notifCorner = Instance.new("UICorner")
-	notifCorner.CornerRadius = UDim.new(0.5, 0)   -- максимально круглые
+	notifCorner.CornerRadius = UDim.new(0.5, 0)
 	notifCorner.Parent = notification
 	
 	local notifStroke = Instance.new("UIStroke")
@@ -178,7 +212,6 @@ local function createNotification(text, duration)
 	fillCorner.CornerRadius = UDim.new(1, 0)
 	fillCorner.Parent = progressFill
 
-	-- Анимации
 	notification.BackgroundTransparency = 1
 	notification.Size = UDim2.new(1, 0, 0, 0)
 	
@@ -238,7 +271,6 @@ local function disableScript()
 	if rainbowConnection then pcall(function() rainbowConnection:Disconnect() end) end
 	if killLoopConnection then pcall(function() killLoopConnection:Disconnect() end) end
 	
-	-- Возвращаем CanCollide при отключении noclip
 	local char = player.Character
 	if char then
 		for _, part in pairs(char:GetDescendants()) do
@@ -406,14 +438,13 @@ local function toggleKillLoop()
 	end
 end
 
--- =========== ПЛАВАЮЩАЯ ИКОНКА (СМАЙЛИК) ===========
+-- =========== ПЛАВАЮЩАЯ ИКОНКА ===========
 local function createFloatingButton()
 	if floatingButton then
 		floatingButton:Destroy()
 		floatingButton = nil
 	end
 	
-	-- Используем TextButton вместо ImageButton (надёжнее)
 	floatingButton = Instance.new("TextButton")
 	floatingButton.Size = UDim2.new(0, 55, 0, 55)
 	floatingButton.Position = UDim2.new(0, settings.floatingX, 0, settings.floatingY)
@@ -472,7 +503,6 @@ local function createFloatingButton()
 		end
 	end)
 	
-	-- Админ-индикатор (красная точка)
 	if isAdmin then
 		local adminDot = Instance.new("Frame")
 		adminDot.Size = UDim2.new(0, 12, 0, 12)
@@ -1661,7 +1691,7 @@ VisualContainer.CanvasSize = UDim2.new(0, 0, 0, visualY + 30)
 if isAdmin then
 	local AdminContainer = Instance.new("ScrollingFrame")
 	AdminContainer.Size = UDim2.new(1, 0, 1, 0)
-	AdminContainer.CanvasSize = UDim2.new(0, 0, 0, 550)
+	AdminContainer.CanvasSize = UDim2.new(0, 0, 0, 650)
 	AdminContainer.ScrollBarThickness = 4
 	AdminContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
 	AdminContainer.BackgroundTransparency = 1
@@ -1669,7 +1699,7 @@ if isAdmin then
 	AdminContainer.Parent = ContentContainer
 	
 	local AdminContent = Instance.new("Frame")
-	AdminContent.Size = UDim2.new(1, 0, 0, 570)
+	AdminContent.Size = UDim2.new(1, 0, 0, 670)
 	AdminContent.BackgroundTransparency = 1
 	AdminContent.Parent = AdminContainer
 	
