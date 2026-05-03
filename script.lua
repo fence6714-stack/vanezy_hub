@@ -111,122 +111,6 @@ local DEFAULT_SETTINGS = {
 
 local settings = {}
 
--- =========== ЗАГРУЗКА СОХРАНЕНИЙ ===========
-local StorageValues = Instance.new("Folder")
-StorageValues.Name = "UISettings"
-StorageValues.Parent = player
-
-local function loadValue(name, default)
-	local val = StorageValues:GetAttribute(name)
-	if val ~= nil then return val end
-	return default
-end
-
-local function saveValue(name, value)
-	StorageValues:SetAttribute(name, value)
-end
-
-for key, default in pairs(DEFAULT_SETTINGS) do
-	settings[key] = loadValue(key, default)
-end
-
--- =========== СОЗДАНИЕ GUI ===========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SynapseHub"
-ScreenGui.ResetOnSpawn = false
-
-local playerGui = player:WaitForChild("PlayerGui")
-pcall(function()
-	ScreenGui.Parent = playerGui
-end)
-
-if not ScreenGui.Parent then
-	ScreenGui.Parent = playerGui
-end
-
--- =========== ФУНКЦИИ УВЕДОМЛЕНИЙ ===========
-local activeNotifications = {}
-local notificationContainer = nil
-
-local function createNotification(text, duration)
-	if not notificationContainer then
-		notificationContainer = Instance.new("Frame")
-		notificationContainer.Name = "NotificationContainer"
-		notificationContainer.Size = UDim2.new(10, 300, 0, 0)
-		notificationContainer.Position = UDim2.new(1, -330, 0, 50)
-		notificationContainer.BackgroundTransparency = 1
-		notificationContainer.ClipsDescendants = false
-		notificationContainer.ZIndex = 300
-		notificationContainer.Parent = ScreenGui
-	end
-	
-	local notification = Instance.new("Frame")
-	notification.Size = UDim2.new(1, 0, 0, 50)
-	notification.Position = UDim2.new(0, 0, 1, 0)
-	notification.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-	notification.BackgroundTransparency = 0.1
-	notification.BorderSizePixel = 0
-	notification.ZIndex = 301
-	notification.Parent = notificationContainer
-	
-	local notifCorner = Instance.new("UICorner")
-	notifCorner.CornerRadius = UDim.new(0, 10)
-	notifCorner.Parent = notification
-	
-	local notifStroke = Instance.new("UIStroke")
-	notifStroke.Color = Color3.fromRGB(0, 140, 255)
-	notifStroke.Thickness = 1
-	notifStroke.Parent = notification
-	
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Text = text
-	textLabel.Font = Enum.Font.GothamBold
-	textLabel.TextSize = 12
-	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Size = UDim2.new(1, -15, 0, 30)
-	textLabel.Position = UDim2.new(0, 10, 0, 5)
-	textLabel.TextXAlignment = Enum.TextXAlignment.Left
-	textLabel.ZIndex = 302
-	textLabel.Parent = notification
-	
-	local progressBar = Instance.new("Frame")
-	progressBar.Size = UDim2.new(1, -20, 0, 3)
-	progressBar.Position = UDim2.new(0, 10, 0, 42)
-	progressBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-	progressBar.BorderSizePixel = 0
-	progressBar.ZIndex = 302
-	progressBar.Parent = notification
-	
-	local progressCorner = Instance.new("UICorner")
-	progressCorner.CornerRadius = UDim.new(1, 0)
-	progressCorner.Parent = progressBar
-	
-	local progressFill = Instance.new("Frame")
-	progressFill.Size = UDim2.new(1, 0, 1, 0)
-	progressFill.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
-	progressFill.BorderSizePixel = 0
-	progressFill.ZIndex = 303
-	progressFill.Parent = progressBar
-	
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(1, 0)
-	fillCorner.Parent = progressFill
-	
-	notification.BackgroundTransparency = 1
-	notification.Size = UDim2.new(1, 0, 0, 0)
-	
-	local appearTween = TweenService:Create(notification, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-		BackgroundTransparency = 0.1,
-		Size = UDim2.new(1, 0, 0, 50)
-	})
-	appearTween:Play()
-	
-	for i, notif in ipairs(activeNotifications) do
-		local newY = (i) * 60
-		TweenService:Create(notif.frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-			Position = UDim2.new(0, 0, 0, newY)
-		}):Play()
 -- =========== ФУНКЦИИ УВЕДОМЛЕНИЙ ===========
 local activeNotifications = {}
 local notificationContainer = nil
@@ -245,7 +129,7 @@ local function createNotification(text, duration)
 	end
 	
 	local notification = Instance.new("Frame")
-	notification.Size = UDim2.new(1, 0, 0, 42)                    -- сжатая высота
+	notification.Size = UDim2.new(1, 0, 0, 42)
 	notification.Position = UDim2.new(0, 0, 0, 0)
 	notification.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
 	notification.BackgroundTransparency = 0.08
@@ -253,9 +137,8 @@ local function createNotification(text, duration)
 	notification.ZIndex = 301
 	notification.Parent = notificationContainer
 	
-	-- Максимально круглые (овальные) углы
 	local notifCorner = Instance.new("UICorner")
-	notifCorner.CornerRadius = UDim.new(0.5, 0)                  -- максимально круглые
+	notifCorner.CornerRadius = UDim.new(0.5, 0)   -- максимально круглые
 	notifCorner.Parent = notification
 	
 	local notifStroke = Instance.new("UIStroke")
@@ -276,7 +159,6 @@ local function createNotification(text, duration)
 	textLabel.ZIndex = 302
 	textLabel.Parent = notification
 	
-	-- Прогресс бар
 	local progressBar = Instance.new("Frame")
 	progressBar.Size = UDim2.new(1, -30, 0, 3)
 	progressBar.Position = UDim2.new(0, 15, 1, -6)
@@ -296,7 +178,7 @@ local function createNotification(text, duration)
 	fillCorner.CornerRadius = UDim.new(1, 0)
 	fillCorner.Parent = progressFill
 
-	-- Анимация появления
+	-- Анимации
 	notification.BackgroundTransparency = 1
 	notification.Size = UDim2.new(1, 0, 0, 0)
 	
@@ -306,7 +188,6 @@ local function createNotification(text, duration)
 	})
 	appearTween:Play()
 
-	-- Сдвиг других уведомлений
 	for i, notif in ipairs(activeNotifications) do
 		local newY = i * 48
 		TweenService:Create(notif.frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
@@ -317,13 +198,11 @@ local function createNotification(text, duration)
 	local notificationData = {frame = notification, progressFill = progressFill, textLabel = textLabel, duration = duration}
 	table.insert(activeNotifications, 1, notificationData)
 	
-	-- Прогресс
 	local progressTween = TweenService:Create(progressFill, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
 		Size = UDim2.new(0, 0, 1, 0)
 	})
 	progressTween:Play()
 	
-	-- Удаление
 	task.spawn(function()
 		task.wait(duration)
 		for i, data in ipairs(activeNotifications) do
@@ -346,7 +225,7 @@ local function createNotification(text, duration)
 			end
 		end
 	end)
-		end
+end
 
 -- =========== АДМИН ФУНКЦИИ ===========
 local function disableScript()
