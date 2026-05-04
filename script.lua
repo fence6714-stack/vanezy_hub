@@ -1,482 +1,539 @@
 --[[
-    redz Hub: Blox Fruits GUI Recreation
-    На основе скриншота: вкладки Local Player, Farming, Stack Farm, Farming Other,
-    Fruit and Raid, Sea Event, Upgrade Race, Get, Volcan Event, ESP, PVP
-    + блоки Farming Material, Mastery Farm (GODHUMAN), Level Farm
-    Библиотека: Orion UI (тёмная тема, максимальное сходство)
+    STRONGEST SIMULATOR - v9 FINAL
+    Полный рефакторинг: реальные действия через game:GetService
+    Телепорт: CFrame.new напрямую в HumanoidRootPart
+    Клики: VirtualInputManager с реальными координатами кнопок
+    GUI: 320x300
 --]]
 
--- Инициализация Orion UI
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Qanuir/orion-ui/main/source"))()
-local Window = OrionLib:MakeWindow({
-    Name = "redz Hub: Blox Fruits by real redz",
-    SubTitle = "VanezyScripts",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "RedzHub_Config",
-    IntroEnabled = true,
-    IntroText = "redz Hub"
-})
+-- Ждём полной загрузки игры
+repeat task.wait(0.1) until game:IsLoaded()
 
--- Основные вкладки согласно скриншоту
-local TabLocalPlayer = Window:MakeTab({Name = "Local Player", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local TabSettingFarm = Window:MakeTab({Name = "Setting Farm", Icon = "rbxassetid://7733960280", PremiumOnly = false})
-local TabFarming = Window:MakeTab({Name = "Farming", Icon = "rbxassetid://7734055157", PremiumOnly = false})
-local TabStackFarm = Window:MakeTab({Name = "Stack Farm", Icon = "rbxassetid://7733967659", PremiumOnly = false})
-local TabFarmingOther = Window:MakeTab({Name = "Farming Other", Icon = "rbxassetid://7733957924", PremiumOnly = false})
-local TabFruitRaid = Window:MakeTab({Name = "Fruit and Raid", Icon = "rbxassetid://4483345998", PremiumOnly = false})
-local TabSeaEvent = Window:MakeTab({Name = "Sea Event", Icon = "rbxassetid://7733978196", PremiumOnly = false})
-local TabUpgradeRace = Window:MakeTab({Name = "Upgrade Race", Icon = "rbxassetid://7733994645", PremiumOnly = false})
-local TabGet = Window:MakeTab({Name = "Get", Icon = "rbxassetid://4335482701", PremiumOnly = false})
-local TabVolcanEvent = Window:MakeTab({Name = "Volcan Event", Icon = "rbxassetid://7734054769", PremiumOnly = false})
-local TabESP = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://7733967659", PremiumOnly = false})
-local TabPVP = Window:MakeTab({Name = "PVP", Icon = "rbxassetid://7733960280", PremiumOnly = false})
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
--- ===================================================================
--- Tab Local Player (базовые функции игрока)
--- ===================================================================
-TabLocalPlayer:AddSection("Настройки игрока")
+-- Ждём персонажа
+repeat task.wait(0.1) until LocalPlayer.Character
+local Character = LocalPlayer.Character
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
 
-TabLocalPlayer:AddToggle({
-    Name = "Auto Run",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AutoRun = Value
-        while getgenv().AutoRun do
-            -- Эмуляция бега
-            local player = game.Players.LocalPlayer
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                player.Character.Humanoid:Move(Vector3.new(0, 0, -1), true)
+-- Переменные состояния
+local AutoFarmEnabled = false
+local AutoLiftEnabled = false
+local freezeConnection = nil
+
+-- Позиции
+local TrainingPosition = Vector3.new(2284.360, 49.147, 5903.271)
+local LiftStartPosition = Vector3.new(2554.064, 13.710, 5502.688)
+local LiftFinishPosition = Vector3.new(2542.465, 13.186, 6129.139)
+
+-- При респавне переподключаем
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+    Humanoid = newChar:WaitForChild("Humanoid")
+    
+    if AutoFarmEnabled then
+        task.wait(0.5)
+        task.spawn(function() 
+            startFarmClickLoop() 
+        end)
+    end
+    if AutoLiftEnabled then
+        task.wait(0.5)
+        task.spawn(function() 
+            liftLoop() 
+        end)
+    end
+end)
+
+-- ==================== ФУНКЦИИ ====================
+
+-- Телепорт (прямая установка CFrame)
+local function teleportTo(pos)
+    local char = LocalPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(pos)
+            return true
+        end
+    end
+    return false
+end
+
+-- Заморозка в воздухе
+local function freezeCharacter()
+    if freezeConnection then 
+        freezeConnection:Disconnect() 
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+    
+    local frozenPos = hrp.Position
+    
+    freezeConnection = RunService.RenderStepped:Connect(function()
+        local c = LocalPlayer.Character
+        if c then
+            local h = c:FindFirstChild("HumanoidRootPart")
+            local hm = c:FindFirstChild("Humanoid")
+            if h then
+                h.CFrame = CFrame.new(frozenPos)
+                h.Velocity = Vector3.zero
             end
-            task.wait()
+            if hm then
+                hm.PlatformStand = true
+            end
+        end
+    end)
+end
+
+-- Разморозка
+local function unfreezeCharacter()
+    if freezeConnection then
+        freezeConnection:Disconnect()
+        freezeConnection = nil
+    end
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            hum.PlatformStand = false
         end
     end
-})
+end
 
-TabLocalPlayer:AddSlider({
-    Name = "Walk Speed",
-    Min = 16,
-    Max = 350,
-    Default = 16,
-    Color = Color3.fromRGB(255, 100, 100),
-    Increment = 1,
-    ValueName = "studs/s",
-    Callback = function(Value)
-        local player = game.Players.LocalPlayer
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = Value
+-- Поиск кнопки в игре
+local function findButton(names)
+    local all = game:GetDescendants()
+    for _, obj in ipairs(all) do
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            local objName = obj.Name:lower()
+            local objText = ""
+            pcall(function() 
+                if obj:IsA("TextButton") then 
+                    objText = obj.Text:lower() 
+                end 
+            end)
+            
+            for _, n in ipairs(names) do
+                local nl = n:lower()
+                if objName:find(nl) or objText:find(nl) then
+                    return obj
+                end
+            end
         end
     end
-})
+    return nil
+end
 
-TabLocalPlayer:AddSlider({
-    Name = "Jump Power",
-    Min = 50,
-    Max = 500,
-    Default = 50,
-    Color = Color3.fromRGB(100, 255, 100),
-    Increment = 1,
-    ValueName = "power",
-    Callback = function(Value)
-        local player = game.Players.LocalPlayer
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.JumpPower = Value
+-- Клик по конкретному элементу GUI
+local function clickGuiButton(buttonName)
+    local btn = findButton(buttonName)
+    if btn then
+        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+        
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        
+        print("Кликнул по кнопке: " .. btn.Name .. " на " .. x .. ", " .. y)
+        return true
+    else
+        print("Кнопка не найдена: " .. buttonName[1])
+        -- Фолбэк: клик в центр экрана
+        VirtualInputManager:SendMouseButtonEvent(960, 540, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(960, 540, 0, false, game, 1)
+        return false
+    end
+end
+
+-- Зажатие кнопки
+local function holdGuiButton(buttonName, duration)
+    local btn = findButton(buttonName)
+    if btn then
+        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+        
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+        task.wait(duration)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        
+        print("Зажал кнопку: " .. btn.Name .. " на " .. duration .. "с")
+        return true
+    else
+        print("Кнопка не найдена для зажатия: " .. buttonName[1])
+        return false
+    end
+end
+
+-- ==================== АВТО-ШТАНГА ====================
+
+-- Цикл кликов после инициализации
+function startFarmClickLoop()
+    while AutoFarmEnabled do
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            task.wait(0.5)
+            continue
+        end
+        
+        clickGuiButton({"train", "качаться", "work", "тренировка", "качать"})
+        task.wait(0.7)
+    end
+    unfreezeCharacter()
+    print("Авто-штанга остановлена")
+end
+
+-- Полный цикл штанги с инициализацией
+function autoFarm()
+    print("=== Запуск авто-штанги ===")
+    
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        print("Нет персонажа, ждём...")
+        repeat task.wait(0.1) until LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        Character = LocalPlayer.Character
+        HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+        Humanoid = Character:FindFirstChild("Humanoid")
+    end
+    
+    -- 1. Телепорт к штанге
+    print("Телепорт к штанге: " .. tostring(TrainingPosition))
+    local tpSuccess = teleportTo(TrainingPosition)
+    print("Телепорт выполнен: " .. tostring(tpSuccess))
+    
+    -- 2. Заморозка
+    print("Заморозка персонажа")
+    freezeCharacter()
+    
+    -- 3. Пауза 0.5 сек
+    task.wait(0.5)
+    
+    -- 4. Зажать кнопку Train на 1 сек
+    print("Зажимаем кнопку Train на 1 секунду")
+    holdGuiButton({"train", "качаться", "work", "тренировка", "качать"}, 1.0)
+    
+    -- 5. Запуск цикла кликов
+    print("Запуск цикла кликов каждые 0.7 сек")
+    startFarmClickLoop()
+end
+
+-- ==================== АВТО-ПРЕДМЕТЫ ====================
+
+function liftLoop()
+    print("=== Запуск авто-предметов ===")
+    
+    while AutoLiftEnabled do
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            task.wait(0.5)
+            continue
+        end
+        
+        -- 1. Телепорт к предмету
+        print("Телепорт к предмету: " .. tostring(LiftStartPosition))
+        teleportTo(LiftStartPosition)
+        
+        -- 2. Клик "Взять"
+        print("Клик по кнопке Взять")
+        clickGuiButton({"lift", "grab", "поднять", "взять", "carry", "нести", "схватить"})
+        
+        -- 3. Телепорт на финиш (предмет следует за персонажем)
+        print("Телепорт на финиш: " .. tostring(LiftFinishPosition))
+        teleportTo(LiftFinishPosition)
+        
+        -- 4. Клик "Сдать"/"Положить" (если нужен)
+        clickGuiButton({"place", "drop", "положить", "сдать", "finish", "финиш"})
+        
+        task.wait(0.5)
+    end
+    print("Авто-предметы остановлены")
+end
+
+-- ==================== GUI (НАТИВНЫЙ) ====================
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TWEAK_v9"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 320, 0, 300)
+Main.Position = UDim2.new(1, -340, 0.5, -150)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+-- Хедер
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundColor3 = Color3.fromRGB(140, 100, 255)
+Header.BorderSizePixel = 0
+Header.Parent = Main
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 10)
+
+local HeaderLabel = Instance.new("TextLabel")
+HeaderLabel.Size = UDim2.new(1, -20, 1, 0)
+HeaderLabel.Position = UDim2.new(0, 15, 0, 0)
+HeaderLabel.BackgroundTransparency = 1
+HeaderLabel.Text = "TWEAK | Strongest Simulator v9"
+HeaderLabel.TextColor3 = Color3.new(1, 1, 1)
+HeaderLabel.Font = Enum.Font.GothamBold
+HeaderLabel.TextSize = 13
+HeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+HeaderLabel.Parent = Header
+
+-- Контент
+local Content = Instance.new("ScrollingFrame")
+Content.Size = UDim2.new(1, -16, 1, -40)
+Content.Position = UDim2.new(0, 8, 0, 40)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 3
+Content.ScrollBarImageColor3 = Color3.fromRGB(140, 100, 255)
+Content.CanvasSize = UDim2.new(0, 0, 0, 260)
+Content.Parent = Main
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 8)
+Layout.Parent = Content
+
+Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Content.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 20)
+end)
+
+-- Функция создания элемента
+local function createElement(elementType, properties)
+    local element = Instance.new(elementType)
+    for k, v in pairs(properties) do
+        if k ~= "Parent" then
+            element[k] = v
         end
     end
+    element.Parent = Content
+    return element
+end
+
+-- Секция Штанга
+createElement("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "— Авто-штанга",
+    TextColor3 = Color3.fromRGB(140, 100, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextXAlignment = Enum.TextXAlignment.Left
 })
 
--- ===================================================================
--- Tab Setting Farm
--- ===================================================================
-TabSettingFarm:AddSection("Конфигурация фарма")
+local FarmFrame = createElement("Frame", {
+    Size = UDim2.new(1, 0, 0, 42),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 55),
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", FarmFrame).CornerRadius = UDim.new(0, 6)
 
-local WeaponList = {"Melee", "Sword", "Gun", "Fruit"}
-TabSettingFarm:AddDropdown({
-    Name = "Select Weapon",
-    Default = "Melee",
-    Options = WeaponList,
-    Callback = function(Value)
-        getgenv().SelectedWeapon = Value
+createElement("TextLabel", {
+    Parent = FarmFrame,
+    Size = UDim2.new(0.6, 0, 1, 0),
+    Position = UDim2.new(0, 12, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Авто-штанга",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamMedium,
+    TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+local FarmToggle = createElement("TextButton", {
+    Parent = FarmFrame,
+    Size = UDim2.new(0, 48, 0, 24),
+    Position = UDim2.new(1, -60, 0.5, -12),
+    BackgroundColor3 = Color3.fromRGB(200, 70, 70),
+    Text = "",
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", FarmToggle).CornerRadius = UDim.new(0, 12)
+
+local FarmCircle = createElement("Frame", {
+    Parent = FarmToggle,
+    Size = UDim2.new(0, 18, 0, 18),
+    Position = UDim2.new(0, 3, 0.5, -9),
+    BackgroundColor3 = Color3.new(1, 1, 1),
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", FarmCircle).CornerRadius = UDim.new(0, 9)
+
+-- Секция Предметы
+createElement("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 20),
+    BackgroundTransparency = 1,
+    Text = "— Авто-предметы",
+    TextColor3 = Color3.fromRGB(140, 100, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+local LiftFrame = createElement("Frame", {
+    Size = UDim2.new(1, 0, 0, 42),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 55),
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", LiftFrame).CornerRadius = UDim.new(0, 6)
+
+createElement("TextLabel", {
+    Parent = LiftFrame,
+    Size = UDim2.new(0.6, 0, 1, 0),
+    Position = UDim2.new(0, 12, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Авто-предметы",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamMedium,
+    TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+local LiftToggle = createElement("TextButton", {
+    Parent = LiftFrame,
+    Size = UDim2.new(0, 48, 0, 24),
+    Position = UDim2.new(1, -60, 0.5, -12),
+    BackgroundColor3 = Color3.fromRGB(200, 70, 70),
+    Text = "",
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", LiftToggle).CornerRadius = UDim.new(0, 12)
+
+local LiftCircle = createElement("Frame", {
+    Parent = LiftToggle,
+    Size = UDim2.new(0, 18, 0, 18),
+    Position = UDim2.new(0, 3, 0.5, -9),
+    BackgroundColor3 = Color3.new(1, 1, 1),
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", LiftCircle).CornerRadius = UDim.new(0, 9)
+
+-- Статус
+local StatusLabel = createElement("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "Статус: Готов",
+    TextColor3 = Color3.fromRGB(180, 180, 190),
+    Font = Enum.Font.GothamMedium,
+    TextSize = 11,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+-- Кнопка СТОП
+local StopBtn = createElement("TextButton", {
+    Size = UDim2.new(1, 0, 0, 38),
+    BackgroundColor3 = Color3.fromRGB(255, 70, 70),
+    Text = "СТОП ВСЁ",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamBold,
+    TextSize = 15,
+    BorderSizePixel = 0
+})
+Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0, 6)
+
+-- Инфо
+createElement("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "Штанга: 2284, 49, 5903\nПредметы: 2554→2542 по 0.5с",
+    TextColor3 = Color3.fromRGB(120, 120, 130),
+    Font = Enum.Font.GothamMedium,
+    TextSize = 9,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+-- ==================== ЛОГИКА ТОГГЛОВ ====================
+
+local farmOn = false
+local liftOn = false
+
+local function updateFarmVisual()
+    if farmOn then
+        FarmToggle.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        FarmCircle.Position = UDim2.new(1, -21, 0.5, -9)
+    else
+        FarmToggle.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
+        FarmCircle.Position = UDim2.new(0, 3, 0.5, -9)
     end
-})
+    updateStatus()
+end
 
-TabSettingFarm:AddToggle({
-    Name = "Safe Mode",
-    Default = true,
-    Callback = function(Value)
-        getgenv().SafeMode = Value
+local function updateLiftVisual()
+    if liftOn then
+        LiftToggle.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        LiftCircle.Position = UDim2.new(1, -21, 0.5, -9)
+    else
+        LiftToggle.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
+        LiftCircle.Position = UDim2.new(0, 3, 0.5, -9)
     end
-})
+    updateStatus()
+end
 
--- ===================================================================
--- Tab Farming
--- ===================================================================
-TabFarming:AddSection("Farming Material")
-
-local MaterialList = {"Wood", "Stone", "Iron", "Gold", "Diamond", "Dragon Scales", "Magma Ore"}
-TabFarming:AddDropdown({
-    Name = "Select Material",
-    Default = "Wood",
-    Options = MaterialList,
-    Callback = function(Value)
-        getgenv().SelectedMaterial = Value
+function updateStatus()
+    if farmOn and liftOn then
+        StatusLabel.Text = "Статус: Штанга + Предметы работают"
+    elseif farmOn then
+        StatusLabel.Text = "Статус: Штанга работает"
+    elseif liftOn then
+        StatusLabel.Text = "Статус: Предметы работают"
+    else
+        StatusLabel.Text = "Статус: Выключено"
     end
-})
+end
 
-TabFarming:AddButton({
-    Name = "Farm Material",
-    Callback = function()
-        getgenv().FarmMaterialActive = not getgenv().FarmMaterialActive
-        OrionLib:MakeNotification({
-            Name = "Farming Material",
-            Content = "Статус: " .. tostring(getgenv().FarmMaterialActive),
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-        while getgenv().FarmMaterialActive do
-            -- Здесь была бы логика фарма материалов (зависит от игры)
-            task.wait(1)
-        end
+FarmToggle.MouseButton1Click:Connect(function()
+    farmOn = not farmOn
+    AutoFarmEnabled = farmOn
+    updateFarmVisual()
+    
+    if farmOn then
+        task.spawn(autoFarm)
+    else
+        unfreezeCharacter()
     end
-})
+end)
 
-TabFarming:AddSection("Mastery Farm")
-
--- Прогресс GODHUMAN (как на скриншоте)
-TabFarming:AddLabel("GODHUMAN")
-TabFarming:AddLabel("Mac: 125")
-TabFarming:AddLabel("Soaring Beast: [Z]")
-TabFarming:AddLabel("Heaven Earth: [X]")
-TabFarming:AddLabel("Sixth Realm Gun: [ACT]")
-
-TabFarming:AddButton({
-    Name = "Mastery 600 (MAX) - 1,802,046/1,892,346",
-    Callback = function()
-        getgenv().MasteryFarmActive = not getgenv().MasteryFarmActive
-        OrionLib:MakeNotification({
-            Name = "Mastery Farm",
-            Content = "Статус: " .. tostring(getgenv().MasteryFarmActive),
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
+LiftToggle.MouseButton1Click:Connect(function()
+    liftOn = not liftOn
+    AutoLiftEnabled = liftOn
+    updateLiftVisual()
+    
+    if liftOn then
+        task.spawn(liftLoop)
     end
-})
+end)
 
-TabFarming:AddSection("Level Farm")
-TabFarming:AddButton({
-    Name = "Level Farm",
-    Callback = function()
-        getgenv().LevelFarmActive = not getgenv().LevelFarmActive
-        OrionLib:MakeNotification({
-            Name = "Level Farm",
-            Content = "Статус: " .. tostring(getgenv().LevelFarmActive),
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
+StopBtn.MouseButton1Click:Connect(function()
+    farmOn = false
+    liftOn = false
+    AutoFarmEnabled = false
+    AutoLiftEnabled = false
+    unfreezeCharacter()
+    updateFarmVisual()
+    updateLiftVisual()
+end)
 
--- ===================================================================
--- Tab Stack Farm
--- ===================================================================
-TabStackFarm:AddSection("Авто-стак фарм")
+updateFarmVisual()
+updateLiftVisual()
 
-TabStackFarm:AddToggle({
-    Name = "Auto Stack NPC",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AutoStackNPC = Value
-    end
-})
-
-TabStackFarm:AddSlider({
-    Name = "Stack Distance",
-    Min = 5,
-    Max = 50,
-    Default = 15,
-    Color = Color3.fromRGB(255, 200, 100),
-    Increment = 1,
-    ValueName = "studs",
-    Callback = function(Value)
-        getgenv().StackDistance = Value
-    end
-})
-
--- ===================================================================
--- Tab Farming Other
--- ===================================================================
-TabFarmingOther:AddSection("Прочие фармы")
-
-TabFarmingOther:AddToggle({
-    Name = "Auto Bone",
-    Default = false,
-    Callback = function(Value) getgenv().AutoBone = Value end
-})
-
-TabFarmingOther:AddToggle({
-    Name = "Auto Ectoplasm",
-    Default = false,
-    Callback = function(Value) getgenv().AutoEctoplasm = Value end
-})
-
-TabFarmingOther:AddToggle({
-    Name = "Auto Dark Fragment",
-    Default = false,
-    Callback = function(Value) getgenv().AutoDarkFragment = Value end
-})
-
--- ===================================================================
--- Tab Fruit and Raid
--- ===================================================================
-TabFruitRaid:AddSection("Фрукты и рейды")
-
-TabFruitRaid:AddToggle({
-    Name = "Auto Raid",
-    Default = false,
-    Callback = function(Value) getgenv().AutoRaid = Value end
-})
-
-TabFruitRaid:AddToggle({
-    Name = "Auto Store Fruit",
-    Default = false,
-    Callback = function(Value) getgenv().AutoStoreFruit = Value end
-})
-
-TabFruitRaid:AddDropdown({
-    Name = "Select Raid Type",
-    Default = "Flame",
-    Options = {"Flame", "Ice", "Quake", "Dark", "Light", "String", "Rumble", "Magma", "Human: Buddha", "Sand", "Dough", "Phoenix"},
-    Callback = function(Value) getgenv().SelectedRaid = Value end
-})
-
--- ===================================================================
--- Tab Sea Event
--- ===================================================================
-TabSeaEvent:AddSection("Морские ивенты")
-
-TabSeaEvent:AddToggle({
-    Name = "Auto Sea Beast",
-    Default = false,
-    Callback = function(Value) getgenv().AutoSeaBeast = Value end
-})
-
-TabSeaEvent:AddToggle({
-    Name = "Auto Ship Farm",
-    Default = false,
-    Callback = function(Value) getgenv().AutoShipFarm = Value end
-})
-
-TabSeaEvent:AddButton({
-    Name = "Teleport to Sea",
-    Callback = function()
-        local player = game.Players.LocalPlayer
-        if player.Character then
-            player.Character:MoveTo(Vector3.new(0, 20, 0)) -- Плейсхолдер координат
-        end
-    end
-})
-
--- ===================================================================
--- Tab Upgrade Race
--- ===================================================================
-TabUpgradeRace:AddSection("Прокачка расы")
-
-local RaceList = {"Human", "Skypian", "Fishman", "Mink", "Cyborg", "Ghoul"}
-TabUpgradeRace:AddDropdown({
-    Name = "Select Race",
-    Default = "Human",
-    Options = RaceList,
-    Callback = function(Value) getgenv().SelectedRace = Value end
-})
-
-TabUpgradeRace:AddButton({
-    Name = "Upgrade to V2",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Race Upgrade",
-            Content = "Запущена прокачка до V2",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
-TabUpgradeRace:AddButton({
-    Name = "Upgrade to V3",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Race Upgrade",
-            Content = "Запущена прокачка до V3",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
-TabUpgradeRace:AddButton({
-    Name = "Upgrade to V4",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Race Upgrade",
-            Content = "Запущена прокачка до V4",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
--- ===================================================================
--- Tab Get
--- ===================================================================
-TabGet:AddSection("Получить предметы")
-
-TabGet:AddButton({
-    Name = "Get All Swords",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Get Items",
-            Content = "Получение всех мечей...",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
-TabGet:AddButton({
-    Name = "Get All Guns",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Get Items",
-            Content = "Получение всего оружия...",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
-TabGet:AddButton({
-    Name = "Get All Accessories",
-    Callback = function()
-        OrionLib:MakeNotification({
-            Name = "Get Items",
-            Content = "Получение аксессуаров...",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
--- ===================================================================
--- Tab Volcan Event
--- ===================================================================
-TabVolcanEvent:AddSection("Вулканический ивент")
-
-TabVolcanEvent:AddToggle({
-    Name = "Auto Volcano",
-    Default = false,
-    Callback = function(Value) getgenv().AutoVolcano = Value end
-})
-
-TabVolcanEvent:AddButton({
-    Name = "Teleport to Volcano",
-    Callback = function()
-        local player = game.Players.LocalPlayer
-        if player.Character then
-            player.Character:MoveTo(Vector3.new(-5500, 550, -1500))
-        end
-    end
-})
-
--- ===================================================================
--- Tab ESP
--- ===================================================================
-TabESP:AddSection("ESP Настройки")
-
-TabESP:AddToggle({
-    Name = "Player ESP",
-    Default = false,
-    Callback = function(Value) getgenv().PlayerESP = Value end
-})
-
-TabESP:AddToggle({
-    Name = "Fruit ESP",
-    Default = false,
-    Callback = function(Value) getgenv().FruitESP = Value end
-})
-
-TabESP:AddToggle({
-    Name = "NPC ESP",
-    Default = false,
-    Callback = function(Value) getgenv().NPCCESP = Value end
-})
-
-TabESP:AddToggle({
-    Name = "Chest ESP",
-    Default = false,
-    Callback = function(Value) getgenv().ChestESP = Value end
-})
-
-TabESP:AddColorpicker({
-    Name = "ESP Color",
-    Default = Color3.fromRGB(255, 0, 0),
-    Callback = function(Value) getgenv().ESPColor = Value end
-})
-
--- ===================================================================
--- Tab PVP
--- ===================================================================
-TabPVP:AddSection("PVP функции")
-
-TabPVP:AddToggle({
-    Name = "Kill Aura",
-    Default = false,
-    Callback = function(Value) getgenv().KillAura = Value end
-})
-
-TabPVP:AddSlider({
-    Name = "Kill Aura Range",
-    Min = 5,
-    Max = 100,
-    Default = 15,
-    Color = Color3.fromRGB(255, 100, 100),
-    Increment = 1,
-    ValueName = "studs",
-    Callback = function(Value) getgenv().KillAuraRange = Value end
-})
-
-TabPVP:AddToggle({
-    Name = "Aim Assist",
-    Default = false,
-    Callback = function(Value) getgenv().AimAssist = Value end
-})
-
-TabPVP:AddToggle({
-    Name = "No Stun",
-    Default = false,
-    Callback = function(Value)
-        getgenv().NoStun = Value
-        local player = game.Players.LocalPlayer
-        if Value and player.Character then
-            -- No Stun реализация
-        end
-    end
-})
-
-TabPVP:AddToggle({
-    Name = "Infinity Combo",
-    Default = false,
-    Callback = function(Value) getgenv().InfinityCombo = Value end
-})
-
--- ===================================================================
--- Закрытие / финализация Orion UI
--- ===================================================================
-OrionLib:Init()
-
--- Автоматическое уведомление о загрузке
-OrionLib:MakeNotification({
-    Name = "redz Hub",
-    Content = "Загружена реплика GUI. 11 вкладок активированы.",
-    Image = "rbxassetid://4483345998",
-    Time = 5
-})
+print("=":rep(40))
+print("TWEAK STRONGEST SIMULATOR v9 ЗАГРУЖЕН")
+print("Авто-штанга: ТП → заморозка → 0.5с → зажать 1с → клики 0.7с")
+print("Авто-предметы: ТП к предмету → Взять → ТП на финиш (0.5с цикл)")
+print("Если не работает - открой F9 и смотри консоль на ошибки")
+print("=":rep(40))
