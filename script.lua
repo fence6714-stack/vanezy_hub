@@ -1,6 +1,7 @@
 --[[
-    STRONGEST SIMULATOR - v12 DEAD SIMPLE
-    Абсолютно чистый код, ничего лишнего
+    STRONGEST SIMULATOR - v13 FINAL
+    Предметы: стоит у предметов 1 сек (клики каждые 0.3) → ТП на финиш → сразу обратно
+    Штанга: без изменений
 --]]
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -70,12 +71,23 @@ end
 
 function liftLoop()
     while AutoLift do
+        -- Телепорт к предметам
         tp(ItemPos)
+        
+        -- Стоим 0.9 сек, кликаем каждые 0.3 сек (3 клика)
         click()
-        task.wait(0.05)
+        task.wait(0.3)
+        click()
+        task.wait(0.3)
+        click()
+        task.wait(0.3)
+        
+        -- Быстрый ТП на финиш и обратно
         tp(FinishPos)
         click()
-        task.wait(0.5)
+        task.wait(0.05)
+        
+        -- Сразу обратно к предметам (начало нового цикла)
     end
 end
 
@@ -93,7 +105,7 @@ main.Parent = gui
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 28)
 title.BackgroundColor3 = Color3.fromRGB(140, 100, 255)
-title.Text = "TWEAK v12"
+title.Text = "TWEAK v13"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 13
@@ -173,4 +185,4 @@ stop.MouseButton1Click:Connect(function()
     b2.Text = "Авто-предметы: OFF"
 end)
 
-print("v12 loaded")
+print("v13 loaded - Предметы: 0.9с у предметов (3 клика) → ТП финиш → обратно")
