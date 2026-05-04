@@ -1,7 +1,7 @@
 --[[
-    STRONGEST SIMULATOR - v15 FINAL
-    Штанга: заморозка у штанги, клики каждые 0.7
-    Предметы: ПОЛНАЯ заморозка у предметов (не двигается) + ТП на финиш с заморозкой
+    STRONGEST SIMULATOR - v16 HEAVY
+    Предметы: Персонаж становится СУПЕР-ТЯЖЁЛЫМ (Mass = 999999) чтобы перевесить предметы
+    + обнуление веса всех Tool в инвентаре
 --]]
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -19,7 +19,7 @@ local FinishPos = Vector3.new(2205.485, 66.495, 6968.355)
 local AutoFarm = false
 local AutoLift = false
 local frozen = nil
-local liftFrozen = nil  -- отдельная заморозка для предметов
+local liftFrozen = nil
 
 plr.CharacterAdded:Connect(function(c)
     char = c
@@ -30,10 +30,86 @@ plr.CharacterAdded:Connect(function(c)
 end)
 
 local function tp(pos)
-    if hrp then hrp.CFrame = CFrame.new(pos) end
+    if hrp then 
+        -- Делаем персонажа сверхтяжёлым перед ТП
+        local mass = Instance.new("NumberValue")
+        mass.Name = "MassValue"
+        mass.Value = 999999
+        mass.Parent = hrp
+        
+        hrp.CFrame = CFrame.new(pos)
+    end
 end
 
--- Заморозка для штанги
+-- Делаем персонажа максимально тяжёлым
+local function makeSuperHeavy()
+    if not hrp then return end
+    
+    -- Ставим массу HumanoidRootPart
+    pcall(function()
+        local bp = hrp:FindFirstChild("BodyPosition")
+        if not bp then
+            bp = Instance.new("BodyPosition")
+            bp.MaxForce = Vector3.new(999999999, 999999999, 999999999)
+            bp.P = 100000
+            bp.D = 10000
+            bp.Position = hrp.Position
+            bp.Parent = hrp
+        end
+    end)
+    
+    -- Обнуляем вес всех предметов в руках
+    for _, obj in pairs(char:GetChildren()) do
+        if obj:IsA("Tool") then
+            local handle = obj:FindFirstChild("Handle")
+            if handle then
+                -- Обнуляем массу предмета
+                pcall(function()
+                    handle.Massless = true
+                    handle.CustomPhysicalProperties = PhysicalProperties.new(0.001, 0, 0, 0, 0)
+                end)
+                -- Фиксируем предмет к персонажу
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = hrp
+                weld.Part1 = handle
+                weld.Parent = obj
+            end
+        end
+    end
+    
+    -- Персонаж - максимальная масса
+    pcall(function()
+        hrp.CustomPhysicalProperties = PhysicalProperties.new(999999, 100000, 100000, 100000, 100000)
+    end)
+end
+
+-- Убираем эффекты
+local function removeHeavy()
+    if hrp then
+        pcall(function()
+            local bp = hrp:FindFirstChild("BodyPosition")
+            if bp then bp:Destroy() end
+            hrp.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.5, 0, 1)
+        end)
+    end
+    if char then
+        for _, obj in pairs(char:GetChildren()) do
+            if obj:IsA("Tool") then
+                local handle = obj:FindFirstChild("Handle")
+                if handle then
+                    pcall(function()
+                        handle.Massless = false
+                        handle.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.5, 0, 1)
+                    end)
+                end
+                -- Убираем weld
+                local weld = obj:FindFirstChildOfClass("WeldConstraint")
+                if weld then weld:Destroy() end
+            end
+        end
+    end
+end
+
 local function freeze()
     if frozen then frozen:Disconnect() end
     local pos = hrp.Position
@@ -48,7 +124,6 @@ local function unfreeze()
     if hum and not AutoLift then hum.PlatformStand = false end
 end
 
--- Заморозка для предметов (держит на месте несмотря на вес)
 local function liftFreeze(pos)
     if liftFrozen then liftFrozen:Disconnect() end
     liftFrozen = game:GetService("RunService").RenderStepped:Connect(function()
@@ -63,6 +138,8 @@ local function liftFreeze(pos)
             hum.WalkSpeed = 0
             hum.JumpPower = 0
         end
+        -- Каждый кадр обновляем массу и убираем вес предметов
+        makeSuperHeavy()
     end)
 end
 
@@ -73,6 +150,7 @@ local function liftUnfreeze()
         hum.WalkSpeed = 16
         hum.JumpPower = 50
     end
+    removeHeavy()
 end
 
 local function click()
@@ -104,7 +182,6 @@ local function hold(t)
     game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, false, game, 1)
 end
 
--- Штанга
 function farmLoop()
     tp(TrainingPos)
     freeze()
@@ -117,30 +194,32 @@ function farmLoop()
     unfreeze()
 end
 
--- Предметы с полной заморозкой
 function liftLoop()
-    -- Встаём у предметов и замораживаемся
+    -- Включаем супер-тяжесть
+    makeSuperHeavy()
+    
+    -- Встаём у предметов и морозим
     tp(ItemPos)
-    liftFreeze(ItemPos)  -- заморозка в позиции предметов
+    liftFreeze(ItemPos)
     
     while AutoLift do
-        -- Кликаем "Взять" 3 раза за 0.9 сек
+        -- Кликаем Взять 3 раза
         for i = 1, 3 do
             if not AutoLift then break end
             clickGrab()
             task.wait(0.3)
         end
         
-        -- Телепорт на финиш (заморозка обновит позицию)
+        -- ТП на финиш (с супер-массой должно телепортироваться всё)
         if AutoLift then
             tp(FinishPos)
-            liftFreeze(FinishPos)  -- заморозка на финише
+            liftFreeze(FinishPos)
             click()
             task.wait(0.3)
             
             -- Обратно к предметам
             tp(ItemPos)
-            liftFreeze(ItemPos)  -- заморозка у предметов
+            liftFreeze(ItemPos)
         end
     end
     liftUnfreeze()
@@ -160,7 +239,7 @@ main.Parent = gui
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 28)
 title.BackgroundColor3 = Color3.fromRGB(140, 100, 255)
-title.Text = "TWEAK v15"
+title.Text = "TWEAK v16 HEAVY"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 13
@@ -242,4 +321,4 @@ stop.MouseButton1Click:Connect(function()
     b2.Text = "Авто-предметы: OFF"
 end)
 
-print("v15 loaded - Полная заморозка предметов (Weight обходится)")
+print("v16 HEAVY loaded - Перс 999999 массы + предметы 0.001 веса + WeldConstraint")
