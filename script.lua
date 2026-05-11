@@ -1,596 +1,639 @@
---[[
-    Mobile Roblox Executor - PosGetter+ PRO FIXED
-    ИСПРАВЛЕНИЯ:
-    - Позиция работает (прямой доступ к Character)
-    - Все кнопки нажимаются (фикс сенсорных событий)
-    - Noclip и Speed работают стабильно
-    - Ползунок регулирует скорость в реальном времени
-    - Копирование ТОЛЬКО координат (X,Y,Z)
---]]
+-- VFF Hub - Blox Fruits Fruit Farmer
+-- Version: 2.0.0
+-- Совместим с большинством экзекуторов (Synapse X, Krnl, Fluxus, Scriptware и др.)
+
+-- ============================================================================
+-- БИБЛИОТЕКИ И УТИЛИТЫ
+-- ============================================================================
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 
--- Конфигурация
-local MenuConfig = {
-    Position = UDim2.new(0.85, 0, 0.12, 0),
-    Size = UDim2.new(0, 190, 0, 330),
-    Color = Color3.fromRGB(20, 20, 30),
-    TextColor = Color3.fromRGB(240, 240, 255),
-    AccentColor = Color3.fromRGB(80, 100, 255),
-    DangerColor = Color3.fromRGB(220, 50, 50),
-    DangerOnColor = Color3.fromRGB(255, 60, 60),
-    SpeedColor = Color3.fromRGB(50, 200, 150),
-    SliderColor = Color3.fromRGB(100, 100, 140)
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+-- ============================================================================
+-- НАСТРОЙКИ И СОХРАНЕНИЕ
+-- ============================================================================
+
+local Settings = {
+    FarmFruit = false,
+    AntiAFK = false,
+    AutoRejoin = false
 }
 
--- Состояния
-local NoclipEnabled = false
-local SpeedEnabled = false
-local CurrentSpeed = 50
-local OriginalWalkspeed = 16
-local Character = nil
-local Humanoid = nil
-local noclipConnection = nil
+local SaveFileName = "VFF_Hub_Settings"
+local SaveData = {}
 
--- Функция получения персонажа (ПРЯМАЯ, БЕЗ ЗАДЕРЖЕК)
-local function GetCharacter()
-    local char = LocalPlayer.Character
-    if char and char.Parent and char:FindFirstChild("HumanoidRootPart") then
-        return char
-    end
-    return nil
-end
-
-local function UpdateCharacter()
-    Character = GetCharacter()
-    if Character then
-        Humanoid = Character:FindFirstChild("Humanoid")
-        if Humanoid and not SpeedEnabled then
-            OriginalWalkspeed = Humanoid.WalkSpeed
-        end
-    end
-end
-
--- GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "PosGetterPro"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")
-
--- Главная панель
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = MenuConfig.Color
-MainFrame.BackgroundTransparency = 0.05
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = MenuConfig.Position
-MainFrame.Size = MenuConfig.Size
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 14)
-UICorner.Parent = MainFrame
-
--- Заголовок
-local TitleBar = Instance.new("Frame")
-TitleBar.Parent = MainFrame
-TitleBar.BackgroundColor3 = MenuConfig.AccentColor
-TitleBar.BackgroundTransparency = 0.2
-TitleBar.Size = UDim2.new(1, 0, 0, 34)
-TitleBar.Position = UDim2.new(0, 0, 0, 0)
-
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 14)
-TitleCorner.Parent = TitleBar
-
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Parent = TitleBar
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Size = UDim2.new(1, -35, 1, 0)
-TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.Text = "🔧 PosGetter+ PRO"
-TitleLabel.TextColor3 = MenuConfig.TextColor
-TitleLabel.TextSize = 13
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Parent = TitleBar
-CloseBtn.Size = UDim2.new(0, 35, 1, 0)
-CloseBtn.Position = UDim2.new(1, -35, 0, 0)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = MenuConfig.TextColor
-CloseBtn.TextSize = 18
-CloseBtn.Font = Enum.Font.GothamBold
-
--- ПОЗИЦИЯ
-local PosSection = Instance.new("Frame")
-PosSection.Parent = MainFrame
-PosSection.Size = UDim2.new(0.9, 0, 0, 95)
-PosSection.Position = UDim2.new(0.05, 0, 0, 44)
-PosSection.BackgroundTransparency = 1
-
-local SectionLabel = Instance.new("TextLabel")
-SectionLabel.Parent = PosSection
-SectionLabel.Size = UDim2.new(1, 0, 0, 18)
-SectionLabel.Position = UDim2.new(0, 0, 0, 0)
-SectionLabel.BackgroundTransparency = 1
-SectionLabel.Text = "📍 ПОЗИЦИЯ"
-SectionLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
-SectionLabel.TextSize = 10
-SectionLabel.Font = Enum.Font.GothamBold
-SectionLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local GetPosBtn = Instance.new("TextButton")
-GetPosBtn.Parent = PosSection
-GetPosBtn.Size = UDim2.new(1, 0, 0, 34)
-GetPosBtn.Position = UDim2.new(0, 0, 0, 20)
-GetPosBtn.BackgroundColor3 = MenuConfig.AccentColor
-GetPosBtn.BackgroundTransparency = 0.25
-GetPosBtn.Text = "📌 Получить и скопировать позицию"
-GetPosBtn.TextColor3 = MenuConfig.TextColor
-GetPosBtn.TextSize = 11
-GetPosBtn.Font = Enum.Font.GothamSemibold
-
-local BtnCorner = Instance.new("UICorner")
-BtnCorner.CornerRadius = UDim.new(0, 8)
-BtnCorner.Parent = GetPosBtn
-
-local PosDisplay = Instance.new("TextBox")
-PosDisplay.Parent = PosSection
-PosDisplay.Size = UDim2.new(1, 0, 0, 30)
-PosDisplay.Position = UDim2.new(0, 0, 0, 60)
-PosDisplay.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
-PosDisplay.BackgroundTransparency = 0.4
-PosDisplay.Text = "Нажмите кнопку"
-PosDisplay.TextColor3 = MenuConfig.TextColor
-PosDisplay.TextSize = 10
-PosDisplay.Font = Enum.Font.Code
-PosDisplay.TextXAlignment = Enum.TextXAlignment.Center
-PosDisplay.ClearTextOnFocus = false
-
-local DisplayCorner = Instance.new("UICorner")
-DisplayCorner.CornerRadius = UDim.new(0, 6)
-DisplayCorner.Parent = PosDisplay
-
--- NOCLIP
-local NoclipSection = Instance.new("Frame")
-NoclipSection.Parent = MainFrame
-NoclipSection.Size = UDim2.new(0.9, 0, 0, 60)
-NoclipSection.Position = UDim2.new(0.05, 0, 0, 148)
-NoclipSection.BackgroundTransparency = 1
-
-local NoclipLabel = Instance.new("TextLabel")
-NoclipLabel.Parent = NoclipSection
-NoclipLabel.Size = UDim2.new(1, 0, 0, 18)
-NoclipLabel.Position = UDim2.new(0, 0, 0, 0)
-NoclipLabel.BackgroundTransparency = 1
-NoclipLabel.Text = "🚪 ПРОХОД СКВОЗЬ СТЕНЫ"
-NoclipLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
-NoclipLabel.TextSize = 10
-NoclipLabel.Font = Enum.Font.GothamBold
-NoclipLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local NoclipBtn = Instance.new("TextButton")
-NoclipBtn.Parent = NoclipSection
-NoclipBtn.Size = UDim2.new(1, 0, 0, 34)
-NoclipBtn.Position = UDim2.new(0, 0, 0, 22)
-NoclipBtn.BackgroundColor3 = MenuConfig.DangerColor
-NoclipBtn.BackgroundTransparency = 0.3
-NoclipBtn.Text = "❌ NOCLIP: ВЫКЛ"
-NoclipBtn.TextColor3 = MenuConfig.TextColor
-NoclipBtn.TextSize = 12
-NoclipBtn.Font = Enum.Font.GothamBold
-
-local NoclipCorner = Instance.new("UICorner")
-NoclipCorner.CornerRadius = UDim.new(0, 8)
-NoclipCorner.Parent = NoclipBtn
-
--- SPEED
-local SpeedSection = Instance.new("Frame")
-SpeedSection.Parent = MainFrame
-SpeedSection.Size = UDim2.new(0.9, 0, 0, 90)
-SpeedSection.Position = UDim2.new(0.05, 0, 0, 218)
-SpeedSection.BackgroundTransparency = 1
-
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Parent = SpeedSection
-SpeedLabel.Size = UDim2.new(1, 0, 0, 18)
-SpeedLabel.Position = UDim2.new(0, 0, 0, 0)
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Text = "⚡ СПИДХАК (ползунок + вкл/выкл)"
-SpeedLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
-SpeedLabel.TextSize = 10
-SpeedLabel.Font = Enum.Font.GothamBold
-SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local SpeedToggleBtn = Instance.new("TextButton")
-SpeedToggleBtn.Parent = SpeedSection
-SpeedToggleBtn.Size = UDim2.new(0.45, 0, 0, 34)
-SpeedToggleBtn.Position = UDim2.new(0, 0, 0, 22)
-SpeedToggleBtn.BackgroundColor3 = MenuConfig.SpeedColor
-SpeedToggleBtn.BackgroundTransparency = 0.3
-SpeedToggleBtn.Text = "⚡ ВЫКЛ"
-SpeedToggleBtn.TextColor3 = MenuConfig.TextColor
-SpeedToggleBtn.TextSize = 11
-SpeedToggleBtn.Font = Enum.Font.GothamBold
-
-local SpeedToggleCorner = Instance.new("UICorner")
-SpeedToggleCorner.CornerRadius = UDim.new(0, 8)
-SpeedToggleCorner.Parent = SpeedToggleBtn
-
-local SpeedSliderFrame = Instance.new("Frame")
-SpeedSliderFrame.Parent = SpeedSection
-SpeedSliderFrame.Size = UDim2.new(0.5, 0, 0, 34)
-SpeedSliderFrame.Position = UDim2.new(0.48, 0, 0, 22)
-SpeedSliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-SpeedSliderFrame.BackgroundTransparency = 0.3
-
-local SliderCorner = Instance.new("UICorner")
-SliderCorner.CornerRadius = UDim.new(0, 8)
-SliderCorner.Parent = SpeedSliderFrame
-
-local SliderTrack = Instance.new("Frame")
-SliderTrack.Parent = SpeedSliderFrame
-SliderTrack.Size = UDim2.new(0.8, 0, 0, 4)
-SliderTrack.Position = UDim2.new(0.1, 0, 0.5, -2)
-SliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-SliderTrack.BorderSizePixel = 0
-
-local TrackCorner = Instance.new("UICorner")
-TrackCorner.CornerRadius = UDim.new(0, 2)
-TrackCorner.Parent = SliderTrack
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Parent = SliderTrack
-SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-SliderFill.BackgroundColor3 = MenuConfig.SpeedColor
-SliderFill.BorderSizePixel = 0
-
-local SliderKnob = Instance.new("TextButton")
-SliderKnob.Parent = SpeedSliderFrame
-SliderKnob.Size = UDim2.new(0, 18, 0, 18)
-SliderKnob.Position = UDim2.new(0.5, -9, 0.5, -9)
-SliderKnob.BackgroundColor3 = MenuConfig.SpeedColor
-SliderKnob.Text = ""
-SliderKnob.AutoButtonColor = false
-
-local KnobCorner = Instance.new("UICorner")
-KnobCorner.CornerRadius = UDim.new(1, 0)
-KnobCorner.Parent = SliderKnob
-
-local SpeedValueLabel = Instance.new("TextLabel")
-SpeedValueLabel.Parent = SpeedSection
-SpeedValueLabel.Size = UDim2.new(0.5, 0, 0, 20)
-SpeedValueLabel.Position = UDim2.new(0.48, 0, 0, 60)
-SpeedValueLabel.BackgroundTransparency = 1
-SpeedValueLabel.Text = "50"
-SpeedValueLabel.TextColor3 = MenuConfig.SpeedColor
-SpeedValueLabel.TextSize = 12
-SpeedValueLabel.Font = Enum.Font.GothamBold
-
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = MainFrame
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 16)
-StatusLabel.Position = UDim2.new(0.05, 0, 1, -24)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Готов"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-StatusLabel.TextSize = 9
-StatusLabel.Font = Enum.Font.Gotham
-
--- ========== ФУНКЦИИ ==========
-
--- ПОЛУЧЕНИЕ ПОЗИЦИИ (РАБОЧАЯ)
-local function GetPlayerPosition()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    local rootPart = char:FindFirstChild("HumanoidRootPart")
-    if rootPart then
-        return rootPart.Position
-    end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then return hrp.Position end
-    return nil
-end
-
--- ФОРМАТ ТОЛЬКО КООРДИНАТЫ
-local function FormatRawPosition(pos)
-    if not pos then return nil end
-    return string.format("%.2f, %.2f, %.2f", pos.X, pos.Y, pos.Z)
-end
-
--- КОПИРОВАНИЕ В БУФЕР (УНИВЕРСАЛЬНОЕ)
-local function CopyToClipboard(text)
-    local success = false
-    if syn and syn.set_clipboard then syn.set_clipboard(text); success = true
-    elseif setclipboard then setclipboard(text); success = true
-    elseif toclipboard then toclipboard(text); success = true
-    elseif writeclipboard then writeclipboard(text); success = true
-    elseif clipbrd then clipbrd(text); success = true
-    elseif mobile and mobile.copy then mobile.copy(text); success = true
-    end
-    return success
-end
-
--- ПОЛУЧИТЬ И СКОПИРОВАТЬ ПОЗИЦИЮ
-local function GetAndCopyPosition()
-    local pos = GetPlayerPosition()
-    if pos then
-        local posStr = FormatRawPosition(pos)
-        PosDisplay.Text = posStr
-        local copied = CopyToClipboard(posStr)
-        if copied then
-            StatusLabel.Text = "✓ Скопировано: " .. posStr
-            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        else
-            StatusLabel.Text = "⚠ Позиция: " .. posStr .. " (буфер не доступен)"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
-        end
+-- Функция сохранения настроек
+local function SaveSettings()
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode({
+            FarmFruit = Settings.FarmFruit,
+            AntiAFK = Settings.AntiAFK,
+            AutoRejoin = Settings.AutoRejoin
+        })
+    end)
+    
+    if success then
+        writefile(SaveFileName .. ".txt", encoded)
+        print("[VFF Hub] Настройки сохранены")
         return true
-    else
-        PosDisplay.Text = "Ошибка: персонаж не найден"
-        StatusLabel.Text = "✗ Не удалось получить позицию"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        return false
+    end
+    return false
+end
+
+-- Функция загрузки настроек
+local function LoadSettings()
+    local success, data = pcall(function()
+        return readfile(SaveFileName .. ".txt")
+    end)
+    
+    if success and data then
+        local decoded = HttpService:JSONDecode(data)
+        Settings.FarmFruit = decoded.FarmFruit or false
+        Settings.AntiAFK = decoded.AntiAFK or false
+        Settings.AutoRejoin = decoded.AutoRejoin or false
+        print("[VFF Hub] Настройки загружены")
+        return true
+    end
+    return false
+end
+
+-- ============================================================================
+-- ФУНКЦИЯ ДЛЯ ФАРМА ФРУКТОВ
+-- ============================================================================
+
+local FruitsList = {
+    "Bomb-Bomb Fruit",
+    "Spike-Spike Fruit",
+    "Chop-Chop Fruit",
+    "Spring-Spring Fruit",
+    "Kilo-Kilo Fruit",
+    "Spin-Spin Fruit",
+    "Love-Love Fruit",
+    "Ice-Ice Fruit",
+    "Sand-Sand Fruit",
+    "Dark-Dark Fruit",
+    "Revive-Revive Fruit",
+    "Diamond-Diamond Fruit",
+    "Light-Light Fruit",
+    "Rubber-Rubber Fruit",
+    "Barrier-Barrier Fruit",
+    "Magma-Magma Fruit",
+    "Quake-Quake Fruit",
+    "Buddha-Buddha Fruit",
+    "Flame-Flame Fruit",
+    "Spider-Spider Fruit",
+    "Rumble-Rumble Fruit",
+    "Portal-Portal Fruit",
+    "Phoenix-Phoenix Fruit",
+    "Dough-Dough Fruit",
+    "Shadow-Shadow Fruit",
+    "Venom-Venom Fruit",
+    "Control-Control Fruit",
+    "Spirit-Spirit Fruit",
+    "Dragon-Dragon Fruit",
+    "Leopard-Leopard Fruit"
+}
+
+local FarmRunning = false
+local LastFruitPosition = nil
+local FruitCheckInterval = 2
+local MaxDistance = 500
+local RejoinAttempts = 0
+
+-- Телепортация к позиции
+local function TeleportTo(position)
+    if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+        Player.Character.HumanoidRootPart.CFrame = CFrame.new(position)
     end
 end
 
--- NOCLIP
-local function ApplyNoclip(state)
-    local char = LocalPlayer.Character
-    if char then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = not state
-            end
+-- Сбор фрукта
+local function CollectFruit(fruit)
+    if fruit and fruit.Parent then
+        local fruitPos = fruit.Position
+        TeleportTo(fruitPos)
+        wait(0.2)
+        
+        if fruit.Parent then
+            fireclickdetector(fruit.ClickDetector)
+            wait(0.3)
+            return true
         end
     end
+    return false
 end
 
-local function StartNoclipLoop()
-    if noclipConnection then noclipConnection:Disconnect() end
-    noclipConnection = RunService.Stepped:Connect(function()
-        if NoclipEnabled then
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide == true then
-                        part.CanCollide = false
+-- Поиск фруктов на карте
+local function FindFruits()
+    local fruits = {}
+    local workspaceItems = workspace:GetDescendants()
+    
+    for _, item in ipairs(workspaceItems) do
+        if item:IsA("Model") and item.Name == "Fruit" then
+            local fruitPart = item:FindFirstChild("Handle")
+            if fruitPart and fruitPart:IsA("BasePart") then
+                table.insert(fruits, fruitPart)
+            end
+        elseif item:IsA("BasePart") and item.Name == "Fruit" then
+            table.insert(fruits, item)
+        end
+    end
+    
+    return fruits
+end
+
+-- Основной цикл фарма фруктов
+local function FarmFruits()
+    while FarmRunning and Settings.FarmFruit and Player and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") do
+        local fruits = FindFruits()
+        
+        if #fruits > 0 then
+            -- Сортируем фрукты по расстоянию
+            local characterPos = Player.Character.HumanoidRootPart.Position
+            table.sort(fruits, function(a, b)
+                return (a.Position - characterPos).Magnitude < (b.Position - characterPos).Magnitude
+            end)
+            
+            -- Собираем ближайший фрукт
+            for _, fruit in ipairs(fruits) do
+                if FarmRunning and Settings.FarmFruit then
+                    local distance = (fruit.Position - characterPos).Magnitude
+                    if distance <= MaxDistance then
+                        CollectFruit(fruit)
+                        wait(0.5)
+                        break
+                    else
+                        TeleportTo(fruit.Position)
+                        wait(0.3)
+                        CollectFruit(fruit)
+                        wait(0.5)
                     end
                 end
             end
+        else
+            -- Если фруктов нет, проверяем настройку AutoRejoin
+            if Settings.AutoRejoin and not game:GetService("CoreGui"):FindFirstChild("TeleportPrompt") then
+                RejoinAttempts = RejoinAttempts + 1
+                print("[VFF Hub] Фруктов не найдено, перезаход через " .. (RejoinAttempts * 2) .. " сек")
+                wait(RejoinAttempts * 2)
+                
+                if not FindFruits() or #FindFruits() == 0 then
+                    if Settings.AutoRejoin then
+                        TeleportService:Teleport(game.PlaceId)
+                        wait(5)
+                    end
+                end
+            else
+                wait(FruitCheckInterval)
+            end
         end
+        
+        wait(0.5)
+    end
+end
+
+-- Запуск фарма
+local function StartFarm()
+    if FarmRunning then return end
+    FarmRunning = true
+    spawn(function()
+        FarmFruits()
     end)
 end
 
-local function ToggleNoclip()
-    NoclipEnabled = not NoclipEnabled
-    if NoclipEnabled then
-        ApplyNoclip(true)
-        StartNoclipLoop()
-        NoclipBtn.Text = "✅ NOCLIP: ВКЛ"
-        NoclipBtn.BackgroundColor3 = MenuConfig.DangerOnColor
-        NoclipBtn.BackgroundTransparency = 0
-        StatusLabel.Text = "✓ Noclip включен"
-    else
-        ApplyNoclip(false)
-        if noclipConnection then noclipConnection:Disconnect() end
-        NoclipBtn.Text = "❌ NOCLIP: ВЫКЛ"
-        NoclipBtn.BackgroundColor3 = MenuConfig.DangerColor
-        NoclipBtn.BackgroundTransparency = 0.3
-        StatusLabel.Text = "✗ Noclip выключен"
-    end
-    StatusLabel.TextColor3 = NoclipEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 150, 150)
-    task.wait(1.2)
-    StatusLabel.Text = "Готов"
-    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+-- Остановка фарма
+local function StopFarm()
+    FarmRunning = false
 end
 
--- SPEED
-local function SetSpeed(value)
-    value = math.clamp(value, 16, 250)
-    CurrentSpeed = value
-    SpeedValueLabel.Text = tostring(math.floor(value))
-    
-    local percent = (value - 16) / (250 - 16)
-    SliderFill.Size = UDim2.new(percent, 0, 1, 0)
-    SliderKnob.Position = UDim2.new(percent, -9, 0.5, -9)
-    
-    if SpeedEnabled then
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.WalkSpeed = CurrentSpeed
+-- ============================================================================
+-- ФУНКЦИИ АНТИ-АФК
+-- ============================================================================
+
+local AntiAFKRunning = false
+
+local function AntiAFK()
+    while AntiAFKRunning and Settings.AntiAFK do
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            local humanoid = Player.Character.Humanoid
+            if humanoid.Sit then
+                humanoid.Sit = false
+            end
+            
+            -- Имитация движения камеры
+            local ts = game:GetService("TweenService")
+            local camera = workspace.CurrentCamera
+            local originalCF = camera.CFrame
+            local newCF = originalCF * CFrame.Angles(0, math.rad(1), 0)
+            
+            ts:Create(camera, TweenInfo.new(0.5), {CFrame = newCF}):Play()
+            wait(0.5)
+            ts:Create(camera, TweenInfo.new(0.5), {CFrame = originalCF}):Play()
+        end
+        
+        -- Эмуляция движения мыши
+        if UserInputService and VirtualUser then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton1(Vector2.new(0, 0))
+            end)
+        end
+        
+        wait(60) -- Каждую минуту
+    end
+end
+
+local function StartAntiAFK()
+    if AntiAFKRunning then return end
+    AntiAFKRunning = true
+    spawn(function()
+        AntiAFK()
+    end)
+end
+
+local function StopAntiAFK()
+    AntiAFKRunning = false
+end
+
+-- ============================================================================
+-- ФУНКЦИИ АВТО-ПЕРЕЗАХОДА
+-- ============================================================================
+
+local AutoRejoinRunning = false
+local PlaceId = game.PlaceId
+
+local function AutoRejoinLoop()
+    while AutoRejoinRunning and Settings.AutoRejoin do
+        -- Проверяем наличие фруктов
+        local fruits = FindFruits()
+        
+        if #fruits == 0 then
+            print("[VFF Hub] Нет фруктов, перезаход через 5 секунд...")
+            wait(5)
+            
+            if #FindFruits() == 0 then
+                TeleportService:Teleport(PlaceId)
+                wait(10)
             end
         end
+        
+        -- Проверка на отключение
+        local success, err = pcall(function()
+            return Players.LocalPlayer and Players.LocalPlayer.Character
+        end)
+        
+        if not success then
+            wait(3)
+            TeleportService:Teleport(PlaceId)
+            wait(10)
+        end
+        
+        wait(30)
     end
 end
 
-local function ToggleSpeed()
-    SpeedEnabled = not SpeedEnabled
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChild("Humanoid")
-    
-    if SpeedEnabled then
-        if hum then
-            OriginalWalkspeed = hum.WalkSpeed
-            hum.WalkSpeed = CurrentSpeed
-        end
-        SpeedToggleBtn.Text = "⚡ ВКЛ"
-        SpeedToggleBtn.BackgroundTransparency = 0
-        StatusLabel.Text = "✓ Спидхак: " .. CurrentSpeed
+local function StartAutoRejoin()
+    if AutoRejoinRunning then return end
+    AutoRejoinRunning = true
+    spawn(function()
+        AutoRejoinLoop()
+    end)
+end
+
+local function StopAutoRejoin()
+    AutoRejoinRunning = false
+end
+
+-- ============================================================================
+-- СОЗДАНИЕ GUI
+-- ============================================================================
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local SubtitleLabel = Instance.new("TextLabel")
+local FarmButton = Instance.new("TextButton")
+local FarmToggle = Instance.new("TextButton")
+local AntiAFKButton = Instance.new("TextButton")
+local AntiAFKToggle = Instance.new("TextButton")
+local AutoRejoinButton = Instance.new("TextButton")
+local AutoRejoinToggle = Instance.new("TextButton")
+local SaveButton = Instance.new("TextButton")
+local CloseButton = Instance.new("TextButton")
+local DragBar = Instance.new("Frame")
+
+-- Настройка GUI
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.Name = "VFFHub"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- MainFrame
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BackgroundTransparency = 0.05
+MainFrame.BorderColor3 = Color3.fromRGB(100, 50, 200)
+MainFrame.BorderSizePixel = 2
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 400, 0, 350)
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- Анимация появления
+MainFrame.BackgroundTransparency = 1
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.05}):Play()
+
+-- DragBar (для перетаскивания)
+DragBar.Parent = MainFrame
+DragBar.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+DragBar.BackgroundTransparency = 0.5
+DragBar.Position = UDim2.new(0, 0, 0, 0)
+DragBar.Size = UDim2.new(1, 0, 0, 30)
+DragBar.Active = true
+DragBar.Draggable = true
+
+-- Title
+TitleLabel.Parent = MainFrame
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 0, 0, 5)
+TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "VFF HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 24
+TitleLabel.TextScaled = false
+
+-- Subtitle
+SubtitleLabel.Parent = MainFrame
+SubtitleLabel.BackgroundTransparency = 1
+SubtitleLabel.Position = UDim2.new(0, 0, 0, 35)
+SubtitleLabel.Size = UDim2.new(1, 0, 0, 20)
+SubtitleLabel.Font = Enum.Font.Gotham
+SubtitleLabel.Text = "vanezy fruit farm"
+SubtitleLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+SubtitleLabel.TextSize = 14
+
+-- Close Button
+CloseButton.Parent = MainFrame
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.Position = UDim2.new(1, -35, 0, 5)
+CloseButton.Size = UDim2.new(0, 30, 0, 25)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 16
+CloseButton.BorderSizePixel = 0
+
+-- Farm Fruit Section
+local FarmSection = Instance.new("TextLabel")
+FarmSection.Parent = MainFrame
+FarmSection.BackgroundTransparency = 1
+FarmSection.Position = UDim2.new(0, 20, 0, 70)
+FarmSection.Size = UDim2.new(1, -40, 0, 30)
+FarmSection.Font = Enum.Font.GothamBold
+FarmSection.Text = "🍎 FARM FRUIT"
+FarmSection.TextColor3 = Color3.fromRGB(255, 255, 255)
+FarmSection.TextSize = 16
+FarmSection.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Farm Toggle (полукруглый ползунок)
+FarmToggle.Parent = MainFrame
+FarmToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+FarmToggle.Position = UDim2.new(1, -80, 0, 70)
+FarmToggle.Size = UDim2.new(0, 60, 0, 30)
+FarmToggle.BorderSizePixel = 0
+FarmToggle.Text = "OFF"
+FarmToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+FarmToggle.TextSize = 14
+
+local FarmToggleCircle = Instance.new("Frame")
+FarmToggleCircle.Parent = FarmToggle
+FarmToggleCircle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+FarmToggleCircle.Position = UDim2.new(0, 5, 0, 5)
+FarmToggleCircle.Size = UDim2.new(0, 20, 0, 20)
+FarmToggleCircle.BorderSizePixel = 0
+
+-- Anti AFK Section
+local AntiAFKSection = Instance.new("TextLabel")
+AntiAFKSection.Parent = MainFrame
+AntiAFKSection.BackgroundTransparency = 1
+AntiAFKSection.Position = UDim2.new(0, 20, 0, 110)
+AntiAFKSection.Size = UDim2.new(1, -40, 0, 30)
+AntiAFKSection.Font = Enum.Font.GothamBold
+AntiAFKSection.Text = "🛡️ ANTI AFK"
+AntiAFKSection.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiAFKSection.TextSize = 16
+AntiAFKSection.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Anti AFK Toggle
+AntiAFKToggle.Parent = MainFrame
+AntiAFKToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+AntiAFKToggle.Position = UDim2.new(1, -80, 0, 110)
+AntiAFKToggle.Size = UDim2.new(0, 60, 0, 30)
+AntiAFKToggle.BorderSizePixel = 0
+AntiAFKToggle.Text = "OFF"
+AntiAFKToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+AntiAFKToggle.TextSize = 14
+
+local AntiAFKToggleCircle = Instance.new("Frame")
+AntiAFKToggleCircle.Parent = AntiAFKToggle
+AntiAFKToggleCircle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+AntiAFKToggleCircle.Position = UDim2.new(0, 5, 0, 5)
+AntiAFKToggleCircle.Size = UDim2.new(0, 20, 0, 20)
+AntiAFKToggleCircle.BorderSizePixel = 0
+
+-- Auto Rejoin Section
+local AutoRejoinSection = Instance.new("TextLabel")
+AutoRejoinSection.Parent = MainFrame
+AutoRejoinSection.BackgroundTransparency = 1
+AutoRejoinSection.Position = UDim2.new(0, 20, 0, 150)
+AutoRejoinSection.Size = UDim2.new(1, -40, 0, 30)
+AutoRejoinSection.Font = Enum.Font.GothamBold
+AutoRejoinSection.Text = "🔄 AUTO REJOIN"
+AutoRejoinSection.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoRejoinSection.TextSize = 16
+AutoRejoinSection.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Auto Rejoin Toggle
+AutoRejoinToggle.Parent = MainFrame
+AutoRejoinToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+AutoRejoinToggle.Position = UDim2.new(1, -80, 0, 150)
+AutoRejoinToggle.Size = UDim2.new(0, 60, 0, 30)
+AutoRejoinToggle.BorderSizePixel = 0
+AutoRejoinToggle.Text = "OFF"
+AutoRejoinToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+AutoRejoinToggle.TextSize = 14
+
+local AutoRejoinToggleCircle = Instance.new("Frame")
+AutoRejoinToggleCircle.Parent = AutoRejoinToggle
+AutoRejoinToggleCircle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+AutoRejoinToggleCircle.Position = UDim2.new(0, 5, 0, 5)
+AutoRejoinToggleCircle.Size = UDim2.new(0, 20, 0, 20)
+AutoRejoinToggleCircle.BorderSizePixel = 0
+
+-- Save Button
+SaveButton.Parent = MainFrame
+SaveButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+SaveButton.Position = UDim2.new(0.5, -80, 1, -60)
+SaveButton.Size = UDim2.new(0, 160, 0, 40)
+SaveButton.Font = Enum.Font.GothamBold
+SaveButton.Text = "💾 СОХРАНИТЬ"
+SaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveButton.TextSize = 16
+SaveButton.BorderSizePixel = 0
+
+-- ============================================================================
+-- ФУНКЦИИ УПРАВЛЕНИЯ GUI И ТОГГЛАМИ
+-- ============================================================================
+
+-- Функция обновления внешнего вида ползунка
+local function UpdateToggle(toggle, circle, state)
+    if state then
+        toggle.BackgroundColor3 = Color3.fromRGB(50, 150, 100)
+        toggle.Text = "ON"
+        toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        circle.BackgroundColor3 = Color3.fromRGB(100, 255, 150)
+        circle.Position = UDim2.new(0, 35, 0, 5)
     else
-        if hum then
-            hum.WalkSpeed = OriginalWalkspeed
-        end
-        SpeedToggleBtn.Text = "⚡ ВЫКЛ"
-        SpeedToggleBtn.BackgroundTransparency = 0.3
-        StatusLabel.Text = "✗ Спидхак выключен"
+        toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        toggle.Text = "OFF"
+        toggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+        circle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        circle.Position = UDim2.new(0, 5, 0, 5)
     end
-    StatusLabel.TextColor3 = SpeedEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 150, 150)
-    task.wait(1.2)
-    StatusLabel.Text = "Готов"
-    StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
 end
 
--- ПОЛЗУНОК (ДРАГ)
+-- Функция обновления состояния фарма
+local function SetFarmState(state)
+    Settings.FarmFruit = state
+    UpdateToggle(FarmToggle, FarmToggleCircle, state)
+    
+    if state then
+        StartFarm()
+    else
+        StopFarm()
+    end
+end
+
+-- Функция обновления состояния анти-афк
+local function SetAntiAFKState(state)
+    Settings.AntiAFK = state
+    UpdateToggle(AntiAFKToggle, AntiAFKToggleCircle, state)
+    
+    if state then
+        StartAntiAFK()
+    else
+        StopAntiAFK()
+    end
+end
+
+-- Функция обновления состояния авто-перезахода
+local function SetAutoRejoinState(state)
+    Settings.AutoRejoin = state
+    UpdateToggle(AutoRejoinToggle, AutoRejoinToggleCircle, state)
+    
+    if state then
+        StartAutoRejoin()
+    else
+        StopAutoRejoin()
+    end
+end
+
+-- Обработчики кнопок
+FarmToggle.MouseButton1Click:Connect(function()
+    SetFarmState(not Settings.FarmFruit)
+end)
+
+AntiAFKToggle.MouseButton1Click:Connect(function()
+    SetAntiAFKState(not Settings.AntiAFK)
+end)
+
+AutoRejoinToggle.MouseButton1Click:Connect(function()
+    SetAutoRejoinState(not Settings.AutoRejoin)
+end)
+
+-- Сохранение настроек
+SaveButton.MouseButton1Click:Connect(function()
+    SaveSettings()
+    
+    -- Анимация кнопки
+    local originalColor = SaveButton.BackgroundColor3
+    SaveButton.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+    wait(0.2)
+    SaveButton.BackgroundColor3 = originalColor
+    
+    print("[VFF Hub] Настройки сохранены!")
+end)
+
+-- Закрытие GUI
+CloseButton.MouseButton1Click:Connect(function()
+    -- Останавливаем все процессы
+    SetFarmState(false)
+    SetAntiAFKState(false)
+    SetAutoRejoinState(false)
+    
+    -- Анимация закрытия
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+    wait(0.3)
+    ScreenGui:Destroy()
+end)
+
+-- ============================================================================
+-- ИНИЦИАЛИЗАЦИЯ
+-- ============================================================================
+
+print("[VFF Hub] VFF Hub загружен!")
+print("[VFF Hub] vanezy fruit farm")
+
+-- Загрузка сохраненных настроек
+LoadSettings()
+
+-- Применение загруженных настроек
+SetFarmState(Settings.FarmFruit)
+SetAntiAFKState(Settings.AntiAFK)
+SetAutoRejoinState(Settings.AutoRejoin)
+
+-- Анимация появления GUI
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = UDim2.new(0, 400, 0, 350)}):Play()
+
+-- Изменяемый размер окна (опционально)
 local dragging = false
-local function UpdateSliderFromPosition(inputPos)
-    local track = SliderTrack
-    local trackPos = track.AbsolutePosition
-    local trackSize = track.AbsoluteSize.X
-    if trackSize <= 0 then return end
-    local relativeX = math.clamp(inputPos.X - trackPos.X, 0, trackSize)
-    local percent = relativeX / trackSize
-    local newSpeed = 16 + percent * (250 - 16)
-    SetSpeed(newSpeed)
-end
+local dragStartPos = nil
+local dragStartFramePos = nil
 
-SliderKnob.MouseButton1Down:Connect(function()
-    dragging = true
-end)
-
-SliderKnob.TouchTap:Connect(function() end)
-SliderKnob.TouchMoved:Connect(function(touch)
-    UpdateSliderFromPosition(touch.Position)
-end)
-
-SliderTrack.MouseButton1Down:Connect(function(x, y)
-    UpdateSliderFromPosition(UserInputService:GetMouseLocation())
-end)
-
-SliderTrack.TouchTap:Connect(function(touch)
-    UpdateSliderFromPosition(touch.Position)
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
+DragBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStartPos = input.Position
+        dragStartFramePos = MainFrame.Position
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                     input.UserInputType == Enum.UserInputType.Touch) then
-        UpdateSliderFromPosition(input.Position)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStartPos
+        MainFrBackgroundTransparencyew(
+            dragStartFramePos.X.Scale,
+            dragStartFramePos.X.Offset + delta.X,
+            dragStartFramePos.Y.Scale,
+            dragStartFramePos.Y.Offset + delta.Y
+        )
     end
 end)
 
--- ========== ОБРАБОТЧИКИ КНОПОК ==========
-local function AnimateButton(btn)
-    local orig = btn.Size
-    local tween = TweenService:Create(btn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Size = UDim2.new(orig.X.Scale, orig.X.Offset, orig.Y.Scale, orig.Y.Offset - 2)})
-    tween:Play()
-    tween.Completed:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = orig}):Play()
-    end)
-end
-
-GetPosBtn.MouseButton1Click:Connect(function()
-    AnimateButton(GetPosBtn)
-    GetAndCopyPosition()
-end)
-
-GetPosBtn.TouchTap:Connect(function()
-    AnimateButton(GetPosBtn)
-    GetAndCopyPosition()
-end)
-
-NoclipBtn.MouseButton1Click:Connect(function()
-    AnimateButton(NoclipBtn)
-    ToggleNoclip()
-end)
-
-NoclipBtn.TouchTap:Connect(function()
-    AnimateButton(NoclipBtn)
-    ToggleNoclip()
-end)
-
-SpeedToggleBtn.MouseButton1Click:Connect(function()
-    AnimateButton(SpeedToggleBtn)
-    ToggleSpeed()
-end)
-
-SpeedToggleBtn.TouchTap:Connect(function()
-    AnimateButton(SpeedToggleBtn)
-    ToggleSpeed()
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    if NoclipEnabled then ToggleNoclip() end
-    if SpeedEnabled then ToggleSpeed() end
-    ScreenGui:Destroy()
-end)
-
-CloseBtn.TouchTap:Connect(function()
-    if NoclipEnabled then ToggleNoclip() end
-    if SpeedEnabled then ToggleSpeed() end
-    ScreenGui:Destroy()
-end)
-
--- ОТСЛЕЖИВАНИЕ ПЕРСОНАЖА
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-    task.wait(0.5)
-    if NoclipEnabled then
-        for _, part in pairs(newChar:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end
-    if SpeedEnabled then
-        local hum = newChar:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = CurrentSpeed
-        end
-    end
-    local pos = GetPlayerPosition()
-    if pos then
-        PosDisplay.Text = FormatRawPosition(pos)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
 end)
 
--- Периодическое обновление отображения позиции (опционально)
-task.spawn(function()
-    while ScreenGui and ScreenGui.Parent do
-        task.wait(2)
-        local pos = GetPlayerPosition()
-        if pos and PosDisplay.Text ~= FormatRawPosition(pos) then
-            PosDisplay.Text = FormatRawPosition(pos)
-        end
-    end
-end)
-
--- ИНИЦИАЛИЗАЦИЯ
-SetSpeed(50)
-
--- Глобальные экспорты
-_G.GetPosition = GetPlayerPosition
-_G.CopyPosition = GetAndCopyPosition
-_G.ToggleNoclip = ToggleNoclip
-_G.ToggleSpeed = ToggleSpeed
-_G.SetSpeed = SetSpeed
-
--- Анимация появления
-MainFrame.BackgroundTransparency = 1
-for i = 1, 10 do
-    MainFrame.BackgroundTransparency = 1 - (i * 0.09)
-    task.wait(0.015)
-end
-
-print("=== PosGetter+ PRO FIXED ===")
-print("Позиция: кнопка 'Получить' -> копирует только X,Y,Z")
-print("Noclip: кнопка вкл/выкл")
-print("Спидхак: кнопка вкл/выкл + ползунок")
+print("[VFF Hub] Интерфейс загружен. Используйте кнопку Save для сохранения настроек!")
