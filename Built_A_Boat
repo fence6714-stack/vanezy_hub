@@ -1,7 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ВЕРСИЯ
-    Координаты сундука: (-55.20, -360.41, 9488.14)
+    КРИТИЧЕСКИЙ ФИКС: разделы и настройки теперь отображаются
 --]]
 
 local Players = game:GetService("Players")
@@ -13,12 +12,10 @@ local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Константы
 local chestPosition = Vector3.new(-55.20, -360.41, 9488.14)
 local flyHeight = 500
 local maxFlySpeed = 1000
 
--- Переменные
 getgenv().AutoChest = false
 getgenv().FlyingActive = false
 getgenv().FlySpeedPercent = 52
@@ -32,13 +29,12 @@ local function getFlySpeed()
     return math.floor(maxFlySpeed * getgenv().FlySpeedPercent / 100)
 end
 
--- Очистка
 if CoreGui:FindFirstChild("VanezyHub") then CoreGui:FindFirstChild("VanezyHub"):Destroy() end
 if CoreGui:FindFirstChild("VanezyNotif") then CoreGui:FindFirstChild("VanezyNotif"):Destroy() end
 if CoreGui:FindFirstChild("VanezyToggle") then CoreGui:FindFirstChild("VanezyToggle"):Destroy() end
 
 -- =============================================
--- СОХРАНЕНИЕ НАСТРОЕК
+-- СОХРАНЕНИЕ
 -- =============================================
 local function saveSettings()
     if not getgenv().SaveSettings then return end
@@ -82,11 +78,7 @@ local function startAntiAFK(duration)
                 createNotification("Anti AFK", "Anti afk is turned <font color='rgb(255,80,80)' size='14'>off</font> after the time has expired", 5)
                 break
             end
-            pcall(function()
-                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                task.wait(0.1)
-                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-            end)
+            pcall(function() VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) task.wait(0.1) VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
             task.wait(10)
         end
     end)
@@ -100,7 +92,7 @@ local function stopAntiAFK()
 end
 
 -- =============================================
--- УВЕДОМЛЕНИЯ (ПОЛНОСТЬЮ ПЕРЕПИСАНЫ)
+-- УВЕДОМЛЕНИЯ
 -- =============================================
 local NotifGui = Instance.new("ScreenGui")
 NotifGui.Name = "VanezyNotif"
@@ -114,7 +106,6 @@ local activeNotifications = {}
 local function removeNotification(nf, customButtons)
     local idx = table.find(activeNotifications, nf)
     if idx then table.remove(activeNotifications, idx) end
-    -- Сдвигаем оставшиеся
     for i, n in ipairs(activeNotifications) do
         local ny = 5 + ((i-1) * (customButtons and 100 or 72))
         pcall(function()
@@ -127,17 +118,12 @@ end
 
 function createNotification(title, message, duration, customButtons)
     duration = duration or 5
-    
-    -- Удаляем лишние
     while #activeNotifications >= 5 do
         local oldest = table.remove(activeNotifications, 1)
-        if oldest and oldest.Parent then
-            oldest:Destroy()
-        end
+        if oldest and oldest.Parent then oldest:Destroy() end
     end
     
     local nf = Instance.new("Frame")
-    nf.Name = "Notification"
     nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
     nf.Position = UDim2.new(0.5, -135, 0, -80)
     nf.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
@@ -171,7 +157,6 @@ function createNotification(title, message, duration, customButtons)
     msgLabel.RichText = true
     msgLabel.Parent = nf
     
-    -- Крестик только если нет кастомных кнопок
     local closeBtn
     if not customButtons then
         closeBtn = Instance.new("TextButton")
@@ -192,54 +177,33 @@ function createNotification(title, message, duration, customButtons)
     timeLine.BorderSizePixel = 0
     timeLine.Parent = nf
     
-    -- Позиция
     local yPos = 5 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -135, 0, yPos)
     }):Play()
     
-    -- Таймер линии
-    local lineTween = TweenService:Create(timeLine, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 0, 0, 2)
-    })
+    local lineTween = TweenService:Create(timeLine, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 2)})
     lineTween:Play()
     
-    -- Функция закрытия
     local isClosed = false
     local function closeNotification()
         if isClosed then return end
         isClosed = true
-        
-        -- Останавливаем твин линии
         pcall(function() lineTween:Cancel() end)
-        
-        local hideTween = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Position = UDim2.new(0.5, -135, 0, -80)
-        })
-        hideTween:Play()
-        hideTween.Completed:Connect(function()
-            if nf and nf.Parent then
-                nf:Destroy()
-            end
+        local ht = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(0.5, -135, 0, -80)})
+        ht:Play()
+        ht.Completed:Connect(function()
+            if nf and nf.Parent then nf:Destroy() end
             removeNotification(nf, customButtons)
         end)
     end
     
-    -- Обработчик крестика
-    if closeBtn then
-        closeBtn.MouseButton1Click:Connect(closeNotification)
-    end
+    if closeBtn then closeBtn.MouseButton1Click:Connect(closeNotification) end
     
-    -- Автозакрытие
-    task.delay(duration, function()
-        if not isClosed then
-            closeNotification()
-        end
-    end)
+    task.delay(duration, function() if not isClosed then closeNotification() end end)
     
     table.insert(activeNotifications, nf)
     
-    -- Кастомные кнопки
     if customButtons then
         local btnFrame = Instance.new("Frame")
         btnFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -280,7 +244,6 @@ function createNotification(title, message, duration, customButtons)
         
         return nf, yesBtn, noBtn, closeNotification
     end
-    
     return nf
 end
 
@@ -337,12 +300,12 @@ MainGui.ResetOnSpawn = false
 MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 MainGui.Parent = CoreGui
 
-local GUI_WIDTH = 450
-local GUI_HEIGHT = 320
+local GUI_WIDTH = 440
+local GUI_HEIGHT = 310
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT)
-MainFrame.Position = UDim2.new(0, 30, 0.5, -GUI_HEIGHT/2)
+MainFrame.Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT/2)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -350,14 +313,13 @@ MainFrame.BackgroundTransparency = 1
 MainFrame.Parent = MainGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
 
--- Плавное появление
 MainFrame.BackgroundTransparency = 1
 MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, 0)
-MainFrame.Position = UDim2.new(0, 30, 0.5, 0)
+MainFrame.Position = UDim2.new(0, 25, 0.5, 0)
 TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
     BackgroundTransparency = 0,
     Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT),
-    Position = UDim2.new(0, 30, 0.5, -GUI_HEIGHT/2)
+    Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT/2)
 }):Play()
 
 -- =============================================
@@ -416,7 +378,6 @@ MinBtn.TextSize = 16
 MinBtn.Parent = Header
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 
--- Статус-бар
 local StatusBar = Instance.new("Frame")
 StatusBar.Size = UDim2.new(0, 0, 0, 26)
 StatusBar.Position = UDim2.new(1, -95, 0, 4)
@@ -454,7 +415,6 @@ StatusToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 StatusToggleDot.Parent = StatusToggleBg
 Instance.new("UICorner", StatusToggleDot).CornerRadius = UDim.new(1, 0)
 
--- Перетаскивание
 local winDragging = false
 local winDragStart, winStartPos = nil, nil
 Header.InputBegan:Connect(function(input)
@@ -475,7 +435,7 @@ end)
 -- =============================================
 -- БОКОВАЯ ПАНЕЛЬ
 -- =============================================
-local SIDEBAR_WIDTH = 150
+local SIDEBAR_WIDTH = 145
 local SIDEBAR_COLLAPSED_WIDTH = 45
 
 local SidePanel = Instance.new("Frame")
@@ -494,16 +454,15 @@ ContentPanel.BorderSizePixel = 0
 ContentPanel.ClipsDescendants = true
 ContentPanel.Parent = MainFrame
 
--- Кнопка сворачивания разделов (меньше, не касается низа)
 local CollapseBtn = Instance.new("TextButton")
-CollapseBtn.Size = UDim2.new(0, 20, 0, 20)
-CollapseBtn.Position = UDim2.new(0, SIDEBAR_WIDTH - 20, 1, -25)
+CollapseBtn.Size = UDim2.new(0, 18, 0, 18)
+CollapseBtn.Position = UDim2.new(0, SIDEBAR_WIDTH - 18, 1, -22)
 CollapseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 CollapseBtn.BorderSizePixel = 0
 CollapseBtn.Text = "◀"
 CollapseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 CollapseBtn.Font = Enum.Font.GothamBold
-CollapseBtn.TextSize = 10
+CollapseBtn.TextSize = 9
 CollapseBtn.ZIndex = 10
 CollapseBtn.Parent = MainFrame
 Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
@@ -523,7 +482,6 @@ local TabContents = {}
 local TabIconsOnly = {}
 local currentTab = nil
 
--- Скрыть все вкладки включая настройки
 local function hideAllTabs()
     SettingsContent.Visible = false
     for _, cnt in pairs(TabContents) do
@@ -539,11 +497,10 @@ local function hideAllTabs()
     end
 end
 
--- Создание вкладок
 for i, tab in ipairs(Tabs) do
     local tabBtn = Instance.new("TextButton")
-    tabBtn.Size = UDim2.new(1, -14, 0, 34)
-    tabBtn.Position = UDim2.new(0, 7, 0, 7 + (i-1) * 40)
+    tabBtn.Size = UDim2.new(1, -12, 0, 34)
+    tabBtn.Position = UDim2.new(0, 6, 0, 7 + (i-1) * 40)
     tabBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
     tabBtn.BorderSizePixel = 0
     tabBtn.Text = "  " .. tab.Icon .. "  " .. tab.Name
@@ -597,7 +554,6 @@ for i, tab in ipairs(Tabs) do
     TabIconsOnly[tab.Name] = iconBtn
 
     local function switchToTab()
-        if currentTab == tab.Name then return end
         currentTab = tab.Name
         hideAllTabs()
         content.Visible = true
@@ -605,6 +561,14 @@ for i, tab in ipairs(Tabs) do
         tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         iconBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         iconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        -- Обновляем CanvasSize контента
+        local totalH = 0
+        for _, child in pairs(content:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+                totalH = totalH + child.AbsoluteSize.Y + 5
+            end
+        end
+        content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
     end
 
     tabBtn.MouseButton1Click:Connect(switchToTab)
@@ -612,7 +576,7 @@ for i, tab in ipairs(Tabs) do
 end
 
 -- =============================================
--- КНОПКА НАСТРОЕК
+-- НАСТРОЙКИ
 -- =============================================
 local SettingsBtn = Instance.new("TextButton")
 SettingsBtn.Size = UDim2.new(0, 32, 0, 32)
@@ -657,7 +621,6 @@ SettingsBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Контент настроек
 local SettingsContent = Instance.new("ScrollingFrame")
 SettingsContent.Size = UDim2.new(1, 0, 1, 0)
 SettingsContent.BackgroundTransparency = 1
@@ -687,6 +650,13 @@ SettingsExpandedBtn.MouseButton1Click:Connect(function()
     hideAllTabs()
     SettingsContent.Visible = true
     currentTab = "Settings"
+    local totalH = 0
+    for _, child in pairs(SettingsContent:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+            totalH = totalH + child.AbsoluteSize.Y + 5
+        end
+    end
+    SettingsContent.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
 end)
 
 -- =============================================
@@ -721,8 +691,6 @@ end
 -- =============================================
 createSectionHeader(TabContents["Home"], "Home")
 
-local homeContent = TabContents["Home"]
-
 local function createLink(parent, text, url)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, -16, 0, 36)
@@ -733,8 +701,7 @@ local function createLink(parent, text, url)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -10, 1, 0)
     btn.Position = UDim2.new(0, 10, 0, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = text
+    btn.BackgroundTransparency = 1    btn.Text = text
     btn.TextColor3 = Color3.fromRGB(130, 190, 255)
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 11
@@ -757,12 +724,12 @@ local function createDivider(parent)
     })
 end
 
-createLink(homeContent, "Channel: https://t.me/VanezyScripts", "https://t.me/VanezyScripts")
-createDivider(homeContent)
-createLink(homeContent, "Creator: @vanezy", "https://t.me/vanezy")
-createDivider(homeContent)
-createLink(homeContent, "Friends: https://t.me/ScriptRobox", "https://t.me/ScriptRobox")
-createDivider(homeContent)
+createLink(TabContents["Home"], "Channel: https://t.me/VanezyScripts", "https://t.me/VanezyScripts")
+createDivider(TabContents["Home"])
+createLink(TabContents["Home"], "Creator: @vanezy", "https://t.me/vanezy")
+createDivider(TabContents["Home"])
+createLink(TabContents["Home"], "Friends: https://t.me/ScriptRobox", "https://t.me/ScriptRobox")
+createDivider(TabContents["Home"])
 
 local bugLabel = Instance.new("TextLabel")
 bugLabel.Size = UDim2.new(1, -16, 0, 38)
@@ -773,7 +740,7 @@ bugLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
 bugLabel.Font = Enum.Font.Gotham
 bugLabel.TextSize = 10
 bugLabel.TextWrapped = true
-bugLabel.Parent = homeContent
+bugLabel.Parent = TabContents["Home"]
 Instance.new("UICorner", bugLabel).CornerRadius = UDim.new(0, 6)
 
 -- =============================================
@@ -877,9 +844,7 @@ Instance.new("UICorner", sliderDot).CornerRadius = UDim.new(1, 0)
 
 local sliderDragging = false
 sliderDot.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        sliderDragging = true
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliderDragging = true end
 end)
 sliderBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -905,11 +870,10 @@ UIS.InputChanged:Connect(function(input)
 end)
 
 -- =============================================
--- SETTINGS
+-- SETTINGS CONTENT
 -- =============================================
 createSectionHeader(SettingsContent, "Settings")
 
--- Anti AFK
 local antiAFKFrame = Instance.new("Frame")
 antiAFKFrame.Size = UDim2.new(1, -16, 0, 42)
 antiAFKFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -955,7 +919,6 @@ antiAFKArrow.TextSize = 10
 antiAFKArrow.Parent = antiAFKFrame
 Instance.new("UICorner", antiAFKArrow).CornerRadius = UDim.new(0, 4)
 
--- Выпадающий список
 local antiAFKDropdown = Instance.new("Frame")
 antiAFKDropdown.Size = UDim2.new(1, -16, 0, 0)
 antiAFKDropdown.Position = UDim2.new(0, 8, 1, 0)
@@ -987,13 +950,10 @@ local function createTimeOptions()
     for _, child in pairs(dropdownScroll:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
-    if confirmButtons then
-        confirmButtons:Destroy()
-        confirmButtons = nil
-    end
+    if confirmButtons then confirmButtons:Destroy() confirmButtons = nil end
     
     local times = {0, 40, 60, 80, 100, 120, 140, 160, 180, 200}
-    local timeNames = {"Forever", "40 minutes", "60 minutes", "80 minutes", "100 minutes", "120 minutes", "140 minutes", "160 minutes", "180 minutes", "200 minutes"}
+    local timeNames = {"Forever", "40 min", "60 min", "80 min", "100 min", "120 min", "140 min", "160 min", "180 min", "200 min"}
     
     for i, t in ipairs(times) do
         local optFrame = Instance.new("Frame")
@@ -1040,9 +1000,9 @@ local function createTimeOptions()
                     if getgenv().AntiAFK then
                         stopAntiAFK()
                         startAntiAFK(getgenv().AntiAFKTime)
-                        createNotification("Anti AFK", "✅ Anti AFK has been enabled", 4)
+                        createNotification("Anti AFK", "✅ Anti AFK enabled", 4)
                     else
-                        createNotification("Anti AFK", "✅ Time set. Enable Anti AFK to start.", 4)
+                        createNotification("Anti AFK", "✅ Time set", 4)
                     end
                     antiAFKDropdown.Visible = false
                     antiAFKOpen = false
@@ -1066,10 +1026,6 @@ local function createTimeOptions()
                 confirmNo.MouseButton1Click:Connect(function()
                     antiAFKSelectedTime = getgenv().AntiAFKTime
                     createTimeOptions()
-                    if confirmButtons then
-                        confirmButtons:Destroy()
-                        confirmButtons = nil
-                    end
                 end)
             end
         end)
@@ -1086,14 +1042,12 @@ antiAFKArrow.MouseButton1Click:Connect(function()
         antiAFKArrow.Text = "▲"
     else
         antiAFKDropdown:TweenSize(UDim2.new(1, -16, 0, 0), "Out", "Quad", 0.2, true)
-        task.delay(0.2, function()
-            antiAFKDropdown.Visible = false
-        end)
+        task.delay(0.2, function() antiAFKDropdown.Visible = false end)
         antiAFKArrow.Text = "▼"
     end
 end)
 
--- Save Settings
+-- Save
 local saveFrame = Instance.new("Frame")
 saveFrame.Size = UDim2.new(1, -16, 0, 42)
 saveFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -1190,9 +1144,7 @@ toggleBg.InputBegan:Connect(function(input)
         if getgenv().AutoChest then
             statusLabel.Text = "🚀 Starting..."
             StatusText.Text = "🚀 Starting..."
-            if not getgenv().FlyingActive and isAwayFromChest() then
-                flyToChest()
-            end
+            if not getgenv().FlyingActive and isAwayFromChest() then flyToChest() end
         else
             stopFlying()
             statusLabel.Text = "⏸ Stopped"
@@ -1208,9 +1160,7 @@ StatusToggleBg.InputBegan:Connect(function(input)
         updateAllToggles()
         updateStatusBar()
         if getgenv().AutoChest then
-            if not getgenv().FlyingActive and isAwayFromChest() then
-                flyToChest()
-            end
+            if not getgenv().FlyingActive and isAwayFromChest() then flyToChest() end
         else
             stopFlying()
         end
@@ -1224,7 +1174,7 @@ antiAFKToggleBg.InputBegan:Connect(function(input)
         updateAllToggles()
         if getgenv().AntiAFK then
             startAntiAFK(getgenv().AntiAFKTime)
-            createNotification("Anti AFK", "✅ Anti AFK has been enabled", 4)
+            createNotification("Anti AFK", "✅ Anti AFK enabled", 4)
         else
             stopAntiAFK()
         end
@@ -1236,14 +1186,12 @@ saveToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().SaveSettings = not getgenv().SaveSettings
         updateAllToggles()
-        if getgenv().SaveSettings then
-            saveSettings()
-        end
+        if getgenv().SaveSettings then saveSettings() end
     end
 end)
 
 resetBtn.MouseButton1Click:Connect(function()
-    local nf, yesBtn, noBtn, closeNotif = createNotification("Reset Settings", "Are you sure you want to reset all settings?", 10, true)
+    local nf, yesBtn, noBtn, closeNotif = createNotification("Reset Settings", "Are you sure?", 10, true)
     yesBtn.MouseButton1Click:Connect(function()
         closeNotif()
         getgenv().FlySpeedPercent = 52
@@ -1258,11 +1206,9 @@ resetBtn.MouseButton1Click:Connect(function()
         antiAFKSelectedTime = 0
         createTimeOptions()
         pcall(function() delfile("VanezyHub_Settings.json") end)
-        createNotification("Settings", "✅ All settings have been reset", 3)
+        createNotification("Settings", "✅ Reset done", 3)
     end)
-    noBtn.MouseButton1Click:Connect(function()
-        closeNotif()
-    end)
+    noBtn.MouseButton1Click:Connect(function() closeNotif() end)
 end)
 
 -- =============================================
@@ -1272,10 +1218,7 @@ local flyCoroutine = nil
 
 local function stopFlying()
     getgenv().FlyingActive = false
-    if flyCoroutine then
-        task.cancel(flyCoroutine)
-        flyCoroutine = nil
-    end
+    if flyCoroutine then task.cancel(flyCoroutine) flyCoroutine = nil end
     local char = Player.Character
     if char then
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -1283,26 +1226,17 @@ local function stopFlying()
             if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
             if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
         end
-        if char:FindFirstChild("Humanoid") then
-            char.Humanoid.PlatformStand = false
-        end
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = 0
-                part.CanCollide = true
-            end
-        end
+        if char:FindFirstChild("Humanoid") then char.Humanoid.PlatformStand = false end
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.LocalTransparencyModifier = 0 p.CanCollide = true end end
     end
     statusLabel.Text = "⏸ Stopped"
     StatusText.Text = "⏸ Stopped"
 end
 
 function isAwayFromChest()
-    local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        return true
-    end
-    return (char.HumanoidRootPart.Position - chestPosition).Magnitude > 10
+    local c = Player.Character
+    if not c or not c:FindFirstChild("HumanoidRootPart") then return true end
+    return (c.HumanoidRootPart.Position - chestPosition).Magnitude > 10
 end
 
 local function flyToChest()
@@ -1311,21 +1245,15 @@ local function flyToChest()
     flyCoroutine = task.spawn(function()
         local char = Player.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
-            statusLabel.Text = "❌ No character"
-            StatusText.Text = "❌ No character"
+            statusLabel.Text = "❌ No char"
             getgenv().FlyingActive = false
             return
         end
         local hrp = char.HumanoidRootPart
         local hum = char.Humanoid
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = 0.5
-                part.CanCollide = false
-            end
-        end
-        statusLabel.Text = "👻 Invisible + Noclip"
-        StatusText.Text = "👻 Invisible + Noclip"
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.LocalTransparencyModifier = 0.5 p.CanCollide = false end end
+        statusLabel.Text = "👻 Flying..."
+        StatusText.Text = "👻 Flying..."
         local bv = Instance.new("BodyVelocity")
         bv.Name = "FlyVelocity"
         bv.MaxForce = Vector3.new(400000, 400000, 400000)
@@ -1339,91 +1267,56 @@ local function flyToChest()
         bg.CFrame = hrp.CFrame
         bg.Parent = hrp
         hum.PlatformStand = true
-        local targetAbove = chestPosition + Vector3.new(0, flyHeight, 0)
-        statusLabel.Text = "🔼 Flying to chest..."
-        StatusText.Text = "🔼 Flying..."
-        local currentSpeed = getFlySpeed()
-        local phase1Done = false
-        while getgenv().FlyingActive and not phase1Done do
-            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
-            local currentPos = hrp.Position
-            local direction = targetAbove - currentPos
-            local distance = direction.Magnitude
-            if distance < 3 then
-                bv.Velocity = Vector3.zero
-                hrp.CFrame = CFrame.new(targetAbove)
-                phase1Done = true
-                break
-            end
-            bv.Velocity = direction.Unit * math.min(currentSpeed, distance * 2)
-            bg.CFrame = CFrame.lookAt(currentPos, targetAbove)
+        local spd = getFlySpeed()
+        local tgt = chestPosition + Vector3.new(0, flyHeight, 0)
+        
+        while getgenv().FlyingActive do
+            if not hrp.Parent or hum.Health <= 0 then break end
+            local d = (tgt - hrp.Position).Magnitude
+            if d < 3 then bv.Velocity = Vector3.zero hrp.CFrame = CFrame.new(tgt) break end
+            bv.Velocity = (tgt - hrp.Position).Unit * math.min(spd, d*2)
+            bg.CFrame = CFrame.lookAt(hrp.Position, tgt)
             task.wait()
         end
         if not getgenv().FlyingActive then return end
-        if hum and hum.Health <= 0 then
-            getgenv().FlyingActive = false
-            StatusText.Text = "💀 Dead, waiting..."
-            return
-        end
-        statusLabel.Text = "🔽 Descending..."
-        StatusText.Text = "🔽 Descending..."
+        if hum.Health <= 0 then getgenv().FlyingActive = false StatusText.Text = "💀 Dead" return end
+        
         task.wait(0.2)
-        local phase2Done = false
-        while getgenv().FlyingActive and not phase2Done do
-            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
-            local currentPos = hrp.Position
-            local direction = chestPosition - currentPos
-            local distance = direction.Magnitude
-            if distance < 2 then
-                bv.Velocity = Vector3.zero
-                hrp.CFrame = CFrame.new(chestPosition)
-                phase2Done = true
-                break
-            end
-            local vel = direction.Unit * math.min(currentSpeed * 0.8, distance * 2)
+        while getgenv().FlyingActive do
+            if not hrp.Parent or hum.Health <= 0 then break end
+            local d = (chestPosition - hrp.Position).Magnitude
+            if d < 2 then bv.Velocity = Vector3.zero hrp.CFrame = CFrame.new(chestPosition) break end
+            local vel = (chestPosition - hrp.Position).Unit * math.min(spd*0.8, d*2)
             if vel.Y > 0 then vel = Vector3.new(vel.X, -math.abs(vel.Y), vel.Z) end
             bv.Velocity = vel
-            bg.CFrame = CFrame.lookAt(currentPos, chestPosition)
+            bg.CFrame = CFrame.lookAt(hrp.Position, chestPosition)
             task.wait()
         end
-        if bv then bv:Destroy() end
-        if bg then bg:Destroy() end
-        if hum and hum.PlatformStand then hum.PlatformStand = false end
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = 0
-                part.CanCollide = true
-            end
-        end
+        
+        bv:Destroy() bg:Destroy()
+        if hum then hum.PlatformStand = false end
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.LocalTransparencyModifier = 0 p.CanCollide = true end end
         getgenv().FlyingActive = false
-        if hum and hum.Health <= 0 then
-            StatusText.Text = "💀 Dead, waiting..."
-            return
-        end
-        statusLabel.Text = "🎯 At chest! Waiting..."
+        
+        if hum.Health <= 0 then StatusText.Text = "💀 Dead" return end
+        statusLabel.Text = "🎯 At chest!"
         StatusText.Text = "🎯 At chest!"
         while getgenv().AutoChest and not isAwayFromChest() do
             local c = Player.Character
             if c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChild("Humanoid") then
-                local dist = (c.HumanoidRootPart.Position - chestPosition).Magnitude
-                if dist > 3 and dist < 10 then
-                    c.HumanoidRootPart.CFrame = CFrame.new(chestPosition)
-                end
                 if c.Humanoid.Health <= 0 then break end
+                local dist = (c.HumanoidRootPart.Position - chestPosition).Magnitude
+                if dist > 3 and dist < 10 then c.HumanoidRootPart.CFrame = CFrame.new(chestPosition) end
             end
             task.wait(0.5)
-        end
-        if getgenv().AutoChest and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character.Humanoid.Health > 0 then
-            statusLabel.Text = "🔄 Moved >10, restarting..."
-            StatusText.Text = "🔄 Restarting..."
         end
     end)
 end
 
 -- =============================================
 -- СТАТУС-БАР
--- =============================================local isMinimized = false
-
+-- =============================================
+local isMinimized = false
 function updateStatusBar()
     if isMinimized then
         StatusToggleBg.Visible = true
@@ -1431,17 +1324,13 @@ function updateStatusBar()
         StatusBar.Position = UDim2.new(1, -240, 0, 4)
         StatusBar.BackgroundTransparency = 0
         if getgenv().AutoChest then
-            if not getgenv().FlyingActive and not isAwayFromChest() then
-                StatusText.Text = "🎯 At chest"
-            elseif not getgenv().FlyingActive then
-                StatusText.Text = "🔄 Ready"
-            end
             StatusToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
             StatusToggleDot.Position = UDim2.new(1, -16, 0.5, -7)
+            StatusText.Text = getgenv().FlyingActive and "👻 Flying..." or (isAwayFromChest() and "🔄 Ready" or "🎯 At chest")
         else
-            StatusText.Text = "⏸ Stopped"
             StatusToggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             StatusToggleDot.Position = UDim2.new(0, 2, 0.5, -7)
+            StatusText.Text = "⏸ Stopped"
         end
     else
         StatusBar:TweenSize(UDim2.new(0, 0, 0, 26), "Out", "Quad", 0.2, true)
@@ -1459,52 +1348,50 @@ CollapseBtn.MouseButton1Click:Connect(function()
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_COLLAPSED_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH - 10, 1, -25), "Out", "Quad", 0.25, true)
+        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH-8, 1, -22), "Out", "Quad", 0.25, true)
         CollapseBtn.Text = "▶"
-        for _, btn in pairs(TabButtons) do btn.Visible = false end
-        for _, btn in pairs(TabIconsOnly) do btn.Visible = true end
+        for _, b in pairs(TabButtons) do b.Visible = false end
+        for _, b in pairs(TabIconsOnly) do b.Visible = true end
         SettingsBtn.Visible = false
         SettingsExpanded.Visible = false
-        local compactSettings = SidePanel:FindFirstChild("CompactSettings")
-        if not compactSettings then
-            compactSettings = Instance.new("TextButton")
-            compactSettings.Name = "CompactSettings"
-            compactSettings.Size = UDim2.new(0, 32, 0, 32)
-            compactSettings.Position = UDim2.new(0.5, -16, 1, -42)
-            compactSettings.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-            compactSettings.BorderSizePixel = 0
-            compactSettings.Text = "⚙️"
-            compactSettings.TextColor3 = Color3.fromRGB(180, 180, 180)
-            compactSettings.Font = Enum.Font.GothamBold
-            compactSettings.TextSize = 16
-            compactSettings.Parent = SidePanel
-            Instance.new("UICorner", compactSettings).CornerRadius = UDim.new(0, 6)
-            compactSettings.MouseButton1Click:Connect(function()
+        local cs = SidePanel:FindFirstChild("CompactSettings")
+        if not cs then
+            cs = Instance.new("TextButton", SidePanel)
+            cs.Name = "CompactSettings"
+            cs.Size = UDim2.new(0, 32, 0, 32)
+            cs.Position = UDim2.new(0.5, -16, 1, -42)
+            cs.BackgroundColor3 = Color3.fromRGB(30,30,30)
+            cs.BorderSizePixel = 0
+            cs.Text = "⚙️"
+            cs.TextColor3 = Color3.fromRGB(180,180,180)
+            cs.Font = Enum.Font.GothamBold
+            cs.TextSize = 16
+            Instance.new("UICorner", cs).CornerRadius = UDim.new(0, 6)
+            cs.MouseButton1Click:Connect(function()
                 sidebarCollapsed = false
                 SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
                 ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
                 ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-                CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 20, 1, -25), "Out", "Quad", 0.25, true)
+                CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH-18, 1, -22), "Out", "Quad", 0.25, true)
                 CollapseBtn.Text = "◀"
-                for _, btn in pairs(TabButtons) do btn.Visible = true end
-                for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
+                for _, b in pairs(TabButtons) do b.Visible = true end
+                for _, b in pairs(TabIconsOnly) do b.Visible = false end
                 SettingsBtn.Visible = true
                 SettingsExpanded.Visible = true
-                compactSettings:Destroy()
+                cs:Destroy()
             end)
         end
     else
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 20, 1, -25), "Out", "Quad", 0.25, true)
+        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH-18, 1, -22), "Out", "Quad", 0.25, true)
         CollapseBtn.Text = "◀"
-        for _, btn in pairs(TabButtons) do btn.Visible = true end
-        for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
+        for _, b in pairs(TabButtons) do b.Visible = true end
+        for _, b in pairs(TabIconsOnly) do b.Visible = false end
         SettingsBtn.Visible = true
         SettingsExpanded.Visible = true
-        local cs = SidePanel:FindFirstChild("CompactSettings")
-        if cs then cs:Destroy() end
+        if SidePanel:FindFirstChild("CompactSettings") then SidePanel.CompactSettings:Destroy() end
     end
 end)
 
@@ -1533,29 +1420,18 @@ end)
 local guiVisible = true
 ToggleBtn.MouseButton1Click:Connect(function()
     if guiVisible then
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, GUI_WIDTH, 0, 0),
-            Position = UDim2.new(0, 30, 0.5, 0)
-        }):Play()
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency=1}):Play()
+        TweenService:Create(MainFrame, TweenInfo.new(0.4), {Size=UDim2.new(0,GUI_WIDTH,0,0), Position=UDim2.new(0,25,0.5,0)}):Play()
         task.delay(0.4, function() MainGui.Enabled = false end)
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-        }):Play()
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.4), {BackgroundColor3=Color3.fromRGB(90,90,90)}):Play()
         guiVisible = false
     else
         MainGui.Enabled = true
         MainFrame.BackgroundTransparency = 1
-        MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, 0)
-        MainFrame.Position = UDim2.new(0, 30, 0.5, 0)
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0,
-            Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT),
-            Position = UDim2.new(0, 30, 0.5, -GUI_HEIGHT/2)
-        }):Play()
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        }):Play()
+        MainFrame.Size = UDim2.new(0,GUI_WIDTH,0,0)
+        MainFrame.Position = UDim2.new(0,25,0.5,0)
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency=0, Size=UDim2.new(0,GUI_WIDTH,0,GUI_HEIGHT), Position=UDim2.new(0,25,0.5,-GUI_HEIGHT/2)}):Play()
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.4), {BackgroundColor3=Color3.fromRGB(255,80,80)}):Play()
         guiVisible = true
     end
 end)
@@ -1563,128 +1439,40 @@ end)
 -- =============================================
 -- ЗАКРЫТИЕ
 -- =============================================
-local function showGoodbyeAndClose()
-    local nf, yesBtn, noBtn, closeNotif = createNotification("Are you sure?", "", 10, true)
-    yesBtn.MouseButton1Click:Connect(function()
-        closeNotif()
-        SidePanel.Visible = false
-        ContentPanel.Visible = false
-        Header.Visible = false
-        CollapseBtn.Visible = false
-        
-        local goodbyeText = Instance.new("TextLabel")
-        goodbyeText.Size = UDim2.new(1, 0, 0, 50)
-        goodbyeText.Position = UDim2.new(0, 0, 0.5, -25)
-        goodbyeText.BackgroundTransparency = 1
-        goodbyeText.Text = "See you soon..."
-        goodbyeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        goodbyeText.Font = Enum.Font.GothamBlack
-        goodbyeText.TextSize = 24
-        goodbyeText.TextTransparency = 1
-        goodbyeText.Parent = MainFrame
-        
-        TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            TextTransparency = 0
-        }):Play()
-        
+CloseBtn.MouseButton1Click:Connect(function()
+    local nf, yes, no, close = createNotification("Are you sure?", "", 10, true)
+    yes.MouseButton1Click:Connect(function()
+        close()
+        SidePanel.Visible = false ContentPanel.Visible = false Header.Visible = false CollapseBtn.Visible = false
+        local t = Instance.new("TextLabel", MainFrame)
+        t.Size = UDim2.new(1,0,0,50) t.Position = UDim2.new(0,0,0.5,-25) t.BackgroundTransparency=1
+        t.Text="See you soon..." t.TextColor3=Color3.fromRGB(255,255,255) t.Font=Enum.Font.GothamBlack t.TextSize=24 t.TextTransparency=1
+        TweenService:Create(t, TweenInfo.new(3), {TextTransparency=0}):Play()
         task.delay(4, function()
-            TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                TextTransparency = 1
-            }):Play()
-            TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1
-            }):Play()
-            TweenService:Create(ToggleBtn, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1
-            }):Play()
+            TweenService:Create(t, TweenInfo.new(3), {TextTransparency=1}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(3), {BackgroundTransparency=1}):Play()
+            TweenService:Create(ToggleBtn, TweenInfo.new(3), {BackgroundTransparency=1}):Play()
         end)
-        
-        task.delay(7, function()
-            MainGui:Destroy()
-            NotifGui:Destroy()
-            ToggleBtnGui:Destroy()
-        end)
+        task.delay(7, function() MainGui:Destroy() NotifGui:Destroy() ToggleBtnGui:Destroy() end)
     end)
-    noBtn.MouseButton1Click:Connect(function()
-        closeNotif()
-    end)
-end
-
-CloseBtn.MouseButton1Click:Connect(showGoodbyeAndClose)
+    no.MouseButton1Click:Connect(close)
+end)
 
 -- =============================================
--- АКТИВАЦИЯ
+-- СТАРТ
 -- =============================================
 currentTab = "Home"
-if TabContents["Home"] then
-    TabContents["Home"].Visible = true
-    if TabButtons["Home"] then
-        TabButtons["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        TabButtons["Home"].TextColor3 = Color3.fromRGB(255, 255, 255)
-    end
-    if TabIconsOnly["Home"] then
-        TabIconsOnly["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-    end
-end
+TabContents["Home"].Visible = true
+TabButtons["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+TabButtons["Home"].TextColor3 = Color3.fromRGB(255, 255, 255)
+TabIconsOnly["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 
-Player.CharacterAdded:Connect(function(char)
-    if getgenv().AutoChest then
-        task.wait(0.5)
-        if not getgenv().FlyingActive and isAwayFromChest() then
-            flyToChest()
-        end
-    end
-end)
+Player.CharacterAdded:Connect(function() if getgenv().AutoChest and not getgenv().FlyingActive and isAwayFromChest() then task.wait(0.5) flyToChest() end end)
+Player.CharacterRemoving:Connect(function() if getgenv().FlyingActive then getgenv().FlyingActive = false if flyCoroutine then task.cancel(flyCoroutine) end end end)
 
-Player.CharacterRemoving:Connect(function(char)
-    if getgenv().FlyingActive then
-        getgenv().FlyingActive = false
-        if flyCoroutine then
-            task.cancel(flyCoroutine)
-            flyCoroutine = nil
-        end
-        StatusText.Text = "💀 Dead, waiting..."
-        statusLabel.Text = "💀 Dead, waiting..."
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if getgenv().AutoChest and not getgenv().FlyingActive and isAwayFromChest() then
-            local char = Player.Character
-            if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                flyToChest()
-                while getgenv().FlyingActive do task.wait(0.1) end
-                task.wait(0.5)
-            end
-        end
-        task.wait(0.5)
-    end
-end)
-
-RunService.Stepped:Connect(function()
-    if getgenv().FlyingActive and Player.Character then
-        for _, part in pairs(Player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if isMinimized and getgenv().AutoChest and not getgenv().FlyingActive then
-            if not isAwayFromChest() then
-                StatusText.Text = "🎯 At chest"
-            else
-                StatusText.Text = "🔄 Ready"
-            end
-        end
-        task.wait(1)
-    end
-end)
+task.spawn(function() while true do if getgenv().AutoChest and not getgenv().FlyingActive and isAwayFromChest() and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character.Humanoid.Health > 0 then flyToChest() while getgenv().FlyingActive do task.wait(0.1) end task.wait(0.5) end task.wait(0.5) end end)
+RunService.Stepped:Connect(function() if getgenv().FlyingActive and Player.Character then for _, p in pairs(Player.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end end)
 
 task.wait(0.5)
 createNotification("Notification", "Script by Vanezy Scripts team", 5)
-print("Vanezy Hub v1 loaded! Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
+print("Vanezy Hub v1 loaded!")
