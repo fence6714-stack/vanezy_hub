@@ -1,7 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕНИЯМИ
-    Координаты сундука: (-55.20, -360.41, 9488.14)
+    ПОЛНЫЙ СКРИПТ С ФИНАЛЬНЫМИ ИСПРАВЛЕНИЯМИ
 --]]
 
 local Players = game:GetService("Players")
@@ -315,9 +314,22 @@ Header.BorderSizePixel = 0
 Header.Parent = MainFrame
 Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 14)
 
+-- Шестерёнка настроек в заголовке слева
+local HeaderSettingsBtn = Instance.new("TextButton")
+HeaderSettingsBtn.Size = UDim2.new(0, 28, 0, 28)
+HeaderSettingsBtn.Position = UDim2.new(0, 10, 0.5, -14)
+HeaderSettingsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+HeaderSettingsBtn.BorderSizePixel = 0
+HeaderSettingsBtn.Text = "⚙️"
+HeaderSettingsBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+HeaderSettingsBtn.Font = Enum.Font.GothamBold
+HeaderSettingsBtn.TextSize = 14
+HeaderSettingsBtn.Parent = Header
+Instance.new("UICorner", HeaderSettingsBtn).CornerRadius = UDim.new(0, 6)
+
 local HubTitle = Instance.new("TextLabel")
-HubTitle.Size = UDim2.new(1, -55, 0, 22)
-HubTitle.Position = UDim2.new(0, 14, 0, 5)
+HubTitle.Size = UDim2.new(1, -95, 0, 22)
+HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
 HubTitle.Text = "Vanezy Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -327,8 +339,8 @@ HubTitle.TextXAlignment = Enum.TextXAlignment.Left
 HubTitle.Parent = Header
 
 local HubSub = Instance.new("TextLabel")
-HubSub.Size = UDim2.new(1, -55, 0, 14)
-HubSub.Position = UDim2.new(0, 14, 0, 27)
+HubSub.Size = UDim2.new(1, -95, 0, 14)
+HubSub.Position = UDim2.new(0, 45, 0, 27)
 HubSub.BackgroundTransparency = 1
 HubSub.Text = "by vanezy scripts"
 HubSub.TextColor3 = Color3.fromRGB(100, 100, 100)
@@ -449,7 +461,36 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
--- Функция создания вопросика (ИСПРАВЛЕННАЯ)
+-- Список всех открытых тултипов для закрытия при клике в любом месте
+local allTooltips = {}
+
+local function closeAllTooltips()
+    for _, data in pairs(allTooltips) do
+        if data.tooltip and data.tooltip.Parent then
+            data.tooltipOpen = false
+            if data.helpBtn then
+                data.helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            end
+            TweenService:Create(data.tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 0, 0, 50)
+            }):Play()
+            task.delay(0.2, function()
+                if data.tooltip and data.tooltip.Parent then
+                    data.tooltip.Visible = false
+                end
+            end)
+        end
+    end
+    allTooltips = {}
+end
+
+-- Глобальный обработчик кликов для закрытия тултипов
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        closeAllTooltips()
+    end
+end)
+
 local function createHelpButton(parent, text)
     local helpBtn = Instance.new("TextButton")
     helpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -464,25 +505,31 @@ local function createHelpButton(parent, text)
     helpBtn.Parent = parent
     Instance.new("UICorner", helpBtn).CornerRadius = UDim.new(1, 0)
     
-    -- Тултип создаём в CoreGui чтобы был поверх всего
     local tooltip = Instance.new("Frame")
     tooltip.Size = UDim2.new(0, 200, 0, 50)
-    tooltip.Position = UDim2.new(0, 0, 0, 0)
-    tooltip.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     tooltip.BorderSizePixel = 0
     tooltip.ClipsDescendants = true
     tooltip.Visible = false
     tooltip.ZIndex = 100
-    tooltip.Parent = MainGui -- В главный GUI чтобы быть поверх всего
+    tooltip.Parent = MainGui
     
-    -- Переливающийся градиент
     local gradient = Instance.new("UIGradient", tooltip)
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 140, 40)),
-        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255, 60, 100)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60)),
-    })
+    local hue = 0
+    task.spawn(function()
+        while true do
+            if not tooltip.Visible or not tooltip.Parent then task.wait(0.5) continue end
+            hue = (hue + 0.005) % 1
+            pcall(function()
+                gradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
+                })
+            end)
+            task.wait(0.05)
+        end
+    end)
     
     Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 8)
     Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(80, 80, 80)
@@ -500,51 +547,38 @@ local function createHelpButton(parent, text)
     tooltipText.ZIndex = 101
     tooltipText.Parent = tooltip
     
-    local tooltipOpen = false
+    local tooltipData = {
+        tooltip = tooltip,
+        helpBtn = helpBtn,
+        tooltipOpen = false
+    }
     
-    local function updateTooltipPosition()
+    local function updatePosition()
         local pos = helpBtn.AbsolutePosition
         local size = helpBtn.AbsoluteSize
         tooltip.Position = UDim2.new(0, pos.X + size.X + 5, 0, pos.Y - 10)
     end
     
     helpBtn.MouseButton1Click:Connect(function()
-        tooltipOpen = not tooltipOpen
-        if tooltipOpen then
-            updateTooltipPosition()
+        -- Закрываем все другие тултипы
+        closeAllTooltips()
+        
+        tooltipData.tooltipOpen = not tooltipData.tooltipOpen
+        if tooltipData.tooltipOpen then
+            updatePosition()
             tooltip.Visible = true
-            helpBtn.BackgroundColor3 = Color3.fromRGB(255, 120, 80) -- Подсветка активного
+            helpBtn.BackgroundColor3 = Color3.fromRGB(255, 120, 80)
             tooltip.Size = UDim2.new(0, 0, 0, 50)
             TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 200, 0, 50)
             }):Play()
+            table.insert(allTooltips, tooltipData)
         else
             helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 Size = UDim2.new(0, 0, 0, 50)
             }):Play()
             task.delay(0.2, function() tooltip.Visible = false end)
-        end
-    end)
-    
-    -- Закрытие при клике в другом месте
-    UIS.InputBegan:Connect(function(input)
-        if tooltipOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local pos = input.Position
-            local btnPos = helpBtn.AbsolutePosition
-            local btnSize = helpBtn.AbsoluteSize
-            local tipPos = tooltip.AbsolutePosition
-            local tipSize = tooltip.AbsoluteSize
-            
-            if not (pos.X >= btnPos.X and pos.X <= btnPos.X + btnSize.X and pos.Y >= btnPos.Y and pos.Y <= btnPos.Y + btnSize.Y) and
-               not (pos.X >= tipPos.X and pos.X <= tipPos.X + tipSize.X and pos.Y >= tipPos.Y and pos.Y <= tipPos.Y + tipSize.Y) then
-                tooltipOpen = false
-                helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                    Size = UDim2.new(0, 0, 0, 50)
-                }):Play()
-                task.delay(0.2, function() tooltip.Visible = false end)
-            end
         end
     end)
     
@@ -639,12 +673,34 @@ for i, tab in ipairs(Tabs) do
     local function switchToTab()
         if currentTab == tab.Name then return end
         currentTab = tab.Name
+        
+        -- Анимация переключения: скрываем старый, показываем новый с задержкой
+        local oldContent = nil
+        for _, cnt in pairs(TabContents) do
+            if cnt.Visible then oldContent = cnt break end
+        end
+        
+        if oldContent then
+            -- Плавно скрываем старый
+            TweenService:Create(oldContent, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                BackgroundTransparency = 1
+            }):Play()
+        end
+        
         hideAllTabs()
+        
+        -- Плавно показываем новый
+        content.BackgroundTransparency = 1
         content.Visible = true
+        TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0
+        }):Play()
+        
         tabBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         iconBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         iconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
         local totalH = 0
         for _, child in pairs(content:GetChildren()) do
             if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
@@ -657,6 +713,37 @@ for i, tab in ipairs(Tabs) do
     tabBtn.MouseButton1Click:Connect(switchToTab)
     iconBtn.MouseButton1Click:Connect(switchToTab)
 end
+
+-- Обработчик шестерёнки в заголовке
+HeaderSettingsBtn.MouseButton1Click:Connect(function()
+    if TabContents["Settings"] and TabButtons["Settings"] then
+        local switchFunc = TabButtons["Settings"].MouseButton1Click
+        -- Вызываем переключение на Settings
+        if currentTab ~= "Settings" then
+            currentTab = "Settings"
+            hideAllTabs()
+            local content = TabContents["Settings"]
+            content.BackgroundTransparency = 1
+            content.Visible = true
+            TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0
+            }):Play()
+            TabButtons["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+            TabButtons["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
+            if TabIconsOnly["Settings"] then
+                TabIconsOnly["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+                TabIconsOnly["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+            local totalH = 0
+            for _, child in pairs(content:GetChildren()) do
+                if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+                    totalH = totalH + child.AbsoluteSize.Y + 5
+                end
+            end
+            content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
+        end
+    end
+end)
 
 local SettingsContent = TabContents["Settings"]
 
@@ -683,7 +770,6 @@ local function createSectionHeader(parent, text)
     line.BorderSizePixel = 0
     line.Parent = header
     
-    -- Градиент для линии
     local g = Instance.new("UIGradient", line)
     g.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),
@@ -1456,6 +1542,11 @@ ToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 local function showGoodbyeAndClose()
+    -- Останавливаем все функции
+    getgenv().AutoChest = false
+    stopFlying()
+    stopAntiAFK()
+    
     local sureNotif, yesBtn, noBtn, closeNotif = createNotification("Are you sure?", "", 10, true)
     yesBtn.MouseButton1Click:Connect(function()
         closeNotif()
@@ -1475,23 +1566,26 @@ local function showGoodbyeAndClose()
         goodbyeText.TextTransparency = 1
         goodbyeText.Parent = MainFrame
         
-        TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        -- Появление текста 1.5 сек
+        TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             TextTransparency = 0
         }):Play()
         
-        task.delay(4, function()
-            TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        -- Пауза 1 сек, затем исчезновение 1.5 сек
+        task.delay(2.5, function()
+            TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 TextTransparency = 1
             }):Play()
-            TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            TweenService:Create(MainFrame, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1
             }):Play()
-            TweenService:Create(ToggleBtn, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            TweenService:Create(ToggleBtn, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1
             }):Play()
         end)
         
-        task.delay(7, function()
+        -- Удаление через 4 секунды
+        task.delay(4, function()
             MainGui:Destroy()
             NotifGui:Destroy()
             ToggleBtnGui:Destroy()
