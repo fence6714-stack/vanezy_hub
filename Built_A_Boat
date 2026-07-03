@@ -1,6 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ БЕЗ ОБРЕЗАНИЙ
+    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕНИЯМИ
     Координаты сундука: (-55.20, -360.41, 9488.14)
 --]]
 
@@ -155,7 +155,7 @@ function createNotification(title, message, duration, customButtons)
         closeBtn.Size = UDim2.new(0, 18, 0, 18)
         closeBtn.Position = UDim2.new(1, -24, 0, 7)
         closeBtn.BackgroundTransparency = 1
-        closeBtn.Text = "✕"
+        closeBtn.Text = "x"
         closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
         closeBtn.Font = Enum.Font.GothamBold
         closeBtn.TextSize = 13
@@ -228,7 +228,7 @@ function createNotification(title, message, duration, customButtons)
         local noBtn = Instance.new("TextButton")
         noBtn.Size = UDim2.new(1, 0, 1, 0)
         noBtn.BackgroundTransparency = 1
-        noBtn.Text = "✕"
+        noBtn.Text = "x"
         noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         noBtn.Font = Enum.Font.GothamBold
         noBtn.TextSize = 20
@@ -449,6 +449,62 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
+-- Функция создания вопросика с подсказкой
+local function createHelpButton(parent, text)
+    local helpBtn = Instance.new("TextButton")
+    helpBtn.Size = UDim2.new(0, 16, 0, 16)
+    helpBtn.Position = UDim2.new(0, 0, 0.5, -8)
+    helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    helpBtn.BorderSizePixel = 0
+    helpBtn.Text = "?"
+    helpBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    helpBtn.Font = Enum.Font.GothamBold
+    helpBtn.TextSize = 10
+    helpBtn.ZIndex = 20
+    helpBtn.Parent = parent
+    Instance.new("UICorner", helpBtn).CornerRadius = UDim.new(1, 0)
+    
+    local tooltip = Instance.new("Frame")
+    tooltip.Size = UDim2.new(0, 0, 0, 0)
+    tooltip.Position = UDim2.new(0, 20, 0.5, 0)
+    tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    tooltip.BorderSizePixel = 0
+    tooltip.ClipsDescendants = true
+    tooltip.ZIndex = 25
+    tooltip.Visible = false
+    tooltip.Parent = parent
+    Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(60, 60, 60)
+    
+    local tooltipText = Instance.new("TextLabel")
+    tooltipText.Size = UDim2.new(1, -10, 1, -4)
+    tooltipText.Position = UDim2.new(0, 5, 0, 2)
+    tooltipText.BackgroundTransparency = 1
+    tooltipText.Text = text
+    tooltipText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tooltipText.Font = Enum.Font.Gotham
+    tooltipText.TextSize = 9
+    tooltipText.TextWrapped = true
+    tooltipText.TextXAlignment = Enum.TextXAlignment.Left
+    tooltipText.ZIndex = 26
+    tooltipText.Parent = tooltip
+    
+    local tooltipOpen = false
+    
+    helpBtn.MouseButton1Click:Connect(function()
+        tooltipOpen = not tooltipOpen
+        if tooltipOpen then
+            tooltip.Visible = true
+            tooltip:TweenSize(UDim2.new(0, 180, 0, 40), "Out", "Quad", 0.2, true)
+        else
+            tooltip:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.2, true)
+            task.delay(0.2, function() tooltip.Visible = false end)
+        end
+    end)
+    
+    return helpBtn
+end
+
 local Tabs = {
     {Name = "Home", Icon = "🏠"},
     {Name = "Main", Icon = "🎯"},
@@ -461,6 +517,11 @@ local currentTab = nil
 
 local function hideAllTabs()
     if SettingsContent then SettingsContent.Visible = false end
+    -- Закрываем настройки
+    if settingsOpen then
+        settingsOpen = false
+        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
+    end
     for _, cnt in pairs(TabContents) do
         if cnt then cnt.Visible = false end
     end
@@ -698,6 +759,14 @@ local function createDivider(parent)
 end
 
 local homeContent = TabContents["Home"]
+
+-- Вопросик для Home
+local homeHelpFrame = Instance.new("Frame")
+homeHelpFrame.Size = UDim2.new(1, -16, 0, 24)
+homeHelpFrame.BackgroundTransparency = 1
+homeHelpFrame.Parent = homeContent
+createHelpButton(homeHelpFrame, "Click on links to copy them to clipboard. These are official channels.")
+
 createLink(homeContent, "Channel: https://t.me/VanezyScripts", "https://t.me/VanezyScripts")
 createDivider(homeContent)
 createLink(homeContent, "Creator: @vanezy", "https://t.me/vanezy")
@@ -737,6 +806,7 @@ statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextSize = 11
 statusLabel.Parent = statusFrame
 
+-- Auto chest с вопросиком
 local toggleFrame = Instance.new("Frame")
 toggleFrame.Size = UDim2.new(1, -16, 0, 42)
 toggleFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -745,8 +815,8 @@ toggleFrame.Parent = mainContent
 Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 6)
 
 local toggleLabel = Instance.new("TextLabel")
-toggleLabel.Size = UDim2.new(0.6, 0, 1, 0)
-toggleLabel.Position = UDim2.new(0, 10, 0, 0)
+toggleLabel.Size = UDim2.new(0.5, 0, 1, 0)
+toggleLabel.Position = UDim2.new(0, 28, 0, 0)
 toggleLabel.BackgroundTransparency = 1
 toggleLabel.Text = "Auto chest"
 toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -754,6 +824,8 @@ toggleLabel.Font = Enum.Font.GothamBold
 toggleLabel.TextSize = 13
 toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
 toggleLabel.Parent = toggleFrame
+
+createHelpButton(toggleFrame, "Automatically flies to the treasure chest. Waits until you move away, then repeats.")
 
 local toggleBg = Instance.new("Frame")
 toggleBg.Size = UDim2.new(0, 44, 0, 24)
@@ -771,6 +843,7 @@ toggleDot.BorderSizePixel = 0
 toggleDot.Parent = toggleBg
 Instance.new("UICorner", toggleDot).CornerRadius = UDim.new(1, 0)
 
+-- Speed с вопросиком
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, -16, 0, 46)
 speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -780,7 +853,7 @@ Instance.new("UICorner", speedFrame).CornerRadius = UDim.new(0, 6)
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, -12, 0, 18)
-speedLabel.Position = UDim2.new(0, 10, 0, 4)
+speedLabel.Position = UDim2.new(0, 28, 0, 4)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")"
 speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -788,6 +861,8 @@ speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextSize = 10
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 speedLabel.Parent = speedFrame
+
+createHelpButton(speedFrame, "Adjust flight speed in percent. 100% = max speed (1000). Default: 52%.")
 
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(1, -24, 0, 6)
@@ -844,6 +919,7 @@ end)
 
 createSectionHeader(SettingsContent, "Settings")
 
+-- Anti AFK с вопросиком
 local antiAFKFrame = Instance.new("Frame")
 antiAFKFrame.Size = UDim2.new(1, -16, 0, 42)
 antiAFKFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -853,7 +929,7 @@ Instance.new("UICorner", antiAFKFrame).CornerRadius = UDim.new(0, 6)
 
 local antiAFKLabel = Instance.new("TextLabel")
 antiAFKLabel.Size = UDim2.new(0.5, 0, 1, 0)
-antiAFKLabel.Position = UDim2.new(0, 10, 0, 0)
+antiAFKLabel.Position = UDim2.new(0, 28, 0, 0)
 antiAFKLabel.BackgroundTransparency = 1
 antiAFKLabel.Text = "Anti AFK"
 antiAFKLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -861,6 +937,8 @@ antiAFKLabel.Font = Enum.Font.GothamBold
 antiAFKLabel.TextSize = 13
 antiAFKLabel.TextXAlignment = Enum.TextXAlignment.Left
 antiAFKLabel.Parent = antiAFKFrame
+
+createHelpButton(antiAFKFrame, "Prevents Roblox from kicking you for being idle. Select time limit or set to forever. Performs random actions every 10 seconds.")
 
 local antiAFKToggleBg = Instance.new("Frame")
 antiAFKToggleBg.Size = UDim2.new(0, 44, 0, 24)
@@ -988,7 +1066,7 @@ local function createTimeOptions()
                 confirmNo.Position = UDim2.new(0.5, 10, 0.5, -12)
                 confirmNo.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
                 confirmNo.BorderSizePixel = 0
-                confirmNo.Text = "✕"
+                confirmNo.Text = "x"
                 confirmNo.TextColor3 = Color3.fromRGB(255, 255, 255)
                 confirmNo.Font = Enum.Font.GothamBold
                 confirmNo.TextSize = 16
@@ -1024,6 +1102,7 @@ antiAFKArrow.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Save Settings с вопросиком
 local saveFrame = Instance.new("Frame")
 saveFrame.Size = UDim2.new(1, -16, 0, 42)
 saveFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -1033,7 +1112,7 @@ Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 6)
 
 local saveLabel = Instance.new("TextLabel")
 saveLabel.Size = UDim2.new(0.5, 0, 1, 0)
-saveLabel.Position = UDim2.new(0, 10, 0, 0)
+saveLabel.Position = UDim2.new(0, 28, 0, 0)
 saveLabel.BackgroundTransparency = 1
 saveLabel.Text = "Save Settings"
 saveLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1041,6 +1120,8 @@ saveLabel.Font = Enum.Font.GothamBold
 saveLabel.TextSize = 13
 saveLabel.TextXAlignment = Enum.TextXAlignment.Left
 saveLabel.Parent = saveFrame
+
+createHelpButton(saveFrame, "Saves your settings to a file. When you reload the script, settings will be restored automatically.")
 
 local saveToggleBg = Instance.new("Frame")
 saveToggleBg.Size = UDim2.new(0, 44, 0, 24)
@@ -1057,6 +1138,7 @@ saveToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 saveToggleDot.Parent = saveToggleBg
 Instance.new("UICorner", saveToggleDot).CornerRadius = UDim.new(1, 0)
 
+-- Reset с вопросиком
 local resetFrame = Instance.new("Frame")
 resetFrame.Size = UDim2.new(1, -16, 0, 36)
 resetFrame.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
@@ -1268,8 +1350,7 @@ local function flyToChest()
         StatusText.Text = "🔽 Descending..."
         task.wait(0.2)
         local phase2Done = false
-        while getgenv().FlyingActive and not phase2Done do
-            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
+        while getgenv().FlyingActive and not phase2Done do            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
             local currentPos = hrp.Position
             local direction = chestPosition - currentPos
             local distance = direction.Magnitude
