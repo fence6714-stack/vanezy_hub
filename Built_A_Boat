@@ -1,6 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕНИЯМИ
+    ПОЛНЫЙ СКРИПТ С ПОЛНОСТЬЮ ИСПРАВЛЕННЫМИ НАСТРОЙКАМИ
     Координаты сундука: (-55.20, -360.41, 9488.14)
 --]]
 
@@ -10,6 +10,7 @@ local CoreGui = game:GetService("CoreGui")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
 local chestPosition = Vector3.new(-55.20, -360.41, 9488.14)
@@ -448,158 +449,57 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ВОПРОСИКА
 local function createHelpButton(parent, text)
     local helpBtn = Instance.new("TextButton")
-    helpBtn.Size = UDim2.new(0, 18, 0, 18)
-    helpBtn.Position = UDim2.new(0, 0, 0.5, -9)
+    helpBtn.Size = UDim2.new(0, 16, 0, 16)
+    helpBtn.Position = UDim2.new(0, 0, 0.5, -8)
     helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     helpBtn.BorderSizePixel = 0
     helpBtn.Text = "?"
     helpBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     helpBtn.Font = Enum.Font.GothamBold
-    helpBtn.TextSize = 11
-    helpBtn.ZIndex = 50
+    helpBtn.TextSize = 10
+    helpBtn.ZIndex = 20
     helpBtn.Parent = parent
     Instance.new("UICorner", helpBtn).CornerRadius = UDim.new(1, 0)
     
-    -- Активная рамка
-    local activeBorder = Instance.new("Frame")
-    activeBorder.Size = UDim2.new(1, 0, 1, 0)
-    activeBorder.Position = UDim2.new(0, 0, 0, 0)
-    activeBorder.BackgroundTransparency = 1
-    activeBorder.BorderSizePixel = 0
-    activeBorder.ZIndex = 51
-    activeBorder.Parent = helpBtn
-    local borderStroke = Instance.new("UIStroke", activeBorder)
-    borderStroke.Color = Color3.fromRGB(255, 80, 80)
-    borderStroke.Thickness = 2
-    borderStroke.Transparency = 1
-    
-    -- Всплывающая подсказка
     local tooltip = Instance.new("Frame")
     tooltip.Size = UDim2.new(0, 0, 0, 0)
-    tooltip.Position = UDim2.new(0, 22, 0.5, -20)
-    tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    tooltip.Position = UDim2.new(0, 20, 0.5, 0)
+    tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     tooltip.BorderSizePixel = 0
     tooltip.ClipsDescendants = true
-    tooltip.ZIndex = 999
+    tooltip.ZIndex = 25
     tooltip.Visible = false
     tooltip.Parent = parent
-    Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(80, 80, 80)
-    Instance.new("UIStroke", tooltip).Thickness = 1
-    
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 1, 0)
-    shadow.Position = UDim2.new(0, 0, 0, 0)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.6
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 998
-    shadow.Parent = tooltip
+    Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(60, 60, 60)
     
     local tooltipText = Instance.new("TextLabel")
-    tooltipText.Size = UDim2.new(1, -16, 1, -8)
-    tooltipText.Position = UDim2.new(0, 8, 0, 4)
+    tooltipText.Size = UDim2.new(1, -10, 1, -4)
+    tooltipText.Position = UDim2.new(0, 5, 0, 2)
     tooltipText.BackgroundTransparency = 1
     tooltipText.Text = text
-    tooltipText.TextColor3 = Color3.fromRGB(220, 220, 220)
+    tooltipText.TextColor3 = Color3.fromRGB(200, 200, 200)
     tooltipText.Font = Enum.Font.Gotham
-    tooltipText.TextSize = 10
+    tooltipText.TextSize = 9
     tooltipText.TextWrapped = true
     tooltipText.TextXAlignment = Enum.TextXAlignment.Left
-    tooltipText.ZIndex = 1000
+    tooltipText.ZIndex = 26
     tooltipText.Parent = tooltip
     
     local tooltipOpen = false
-    local closeTimer = nil
-    
-    local function closeTooltip()
-        if not tooltipOpen then return end
-        tooltipOpen = false
-        tooltip:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.15, true)
-        task.delay(0.15, function() 
-            if not tooltipOpen then 
-                tooltip.Visible = false
-                borderStroke.Transparency = 1
-                helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                helpBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-            end
-        end)
-        if closeTimer then
-            task.cancel(closeTimer)
-            closeTimer = nil
-        end
-    end
-    
-    local function openTooltip()
-        if tooltipOpen then 
-            closeTooltip()
-            task.wait(0.1)
-        end
-        tooltipOpen = true
-        tooltip.Visible = true
-        borderStroke.Transparency = 0
-        helpBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        helpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        
-        local textWidth = 200
-        local textHeight = 30
-        local lines = 1
-        local maxLineLength = 35
-        for i = 1, #text, maxLineLength do
-            lines = lines + 1
-        end
-        textHeight = 20 + lines * 14
-        
-        tooltip:TweenSize(UDim2.new(0, textWidth, 0, textHeight), "Out", "Quad", 0.2, true)
-        
-        if closeTimer then task.cancel(closeTimer) end
-        closeTimer = task.delay(8, function()
-            if tooltipOpen then closeTooltip() end
-        end)
-    end
     
     helpBtn.MouseButton1Click:Connect(function()
+        tooltipOpen = not tooltipOpen
         if tooltipOpen then
-            closeTooltip()
+            tooltip.Visible = true
+            tooltip:TweenSize(UDim2.new(0, 180, 0, 40), "Out", "Quad", 0.2, true)
         else
-            openTooltip()
+            tooltip:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.2, true)
+            task.delay(0.2, function() tooltip.Visible = false end)
         end
     end)
-    
-    local function onGlobalClick(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = input.Position
-            local tooltipAbs = tooltip.AbsolutePosition
-            local tooltipSize = tooltip.AbsoluteSize
-            if tooltipOpen then
-                local btnAbs = helpBtn.AbsolutePosition
-                local btnSize = helpBtn.AbsoluteSize
-                local inBtn = mousePos.X >= btnAbs.X and mousePos.X <= btnAbs.X + btnSize.X and
-                             mousePos.Y >= btnAbs.Y and mousePos.Y <= btnAbs.Y + btnSize.Y
-                local inTooltip = mousePos.X >= tooltipAbs.X and mousePos.X <= tooltipAbs.X + tooltipSize.X and
-                                  mousePos.Y >= tooltipAbs.Y and mousePos.Y <= tooltipAbs.Y + tooltipSize.Y
-                if not inBtn and not inTooltip then
-                    closeTooltip()
-                end
-            end
-        end
-    end
-    UIS.InputBegan:Connect(onGlobalClick)
-    
-    local function onScroll()
-        if tooltipOpen then closeTooltip() end
-    end
-    for _, content in pairs(TabContents) do
-        if content then
-            content:GetPropertyChangedSignal("CanvasPosition"):Connect(onScroll)
-        end
-    end
-    if SettingsContent then
-        SettingsContent:GetPropertyChangedSignal("CanvasPosition"):Connect(onScroll)
-    end
     
     return helpBtn
 end
@@ -615,15 +515,20 @@ local TabIconsOnly = {}
 local currentTab = nil
 
 local function hideAllTabs()
-    -- Закрываем панель настроек в боковой панели
+    -- ИСПРАВЛЕНО: Закрываем панель настроек в боковой панели
     if settingsOpen then
         settingsOpen = false
         SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
     end
     
-    -- Скрываем контент настроек
+    -- ИСПРАВЛЕНО: Скрываем контент настроек и все его элементы
     if SettingsContent then 
-        SettingsContent.Visible = false 
+        SettingsContent.Visible = false
+        for _, child in pairs(SettingsContent:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") or child:IsA("ScrollingFrame") then
+                child.Visible = false
+            end
+        end
     end
     
     -- Скрываем все вкладки
@@ -793,11 +698,41 @@ SettingsContent.ChildAdded:Connect(function()
 end)
 
 SettingsExpandedBtn.MouseButton1Click:Connect(function()
-    -- Закрываем все вкладки
-    hideAllTabs()
-    -- Показываем настройки
+    -- ИСПРАВЛЕНО: Закрываем панель настроек в боковой панели
+    if settingsOpen then
+        settingsOpen = false
+        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
+    end
+    
+    -- ИСПРАВЛЕНО: Скрываем ВСЕ вкладки
+    for _, cnt in pairs(TabContents) do
+        if cnt then cnt.Visible = false end
+    end
+    
+    -- Сбрасываем стиль всех кнопок
+    for _, btn in pairs(TabButtons) do
+        if btn then
+            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+    end
+    for _, btn in pairs(TabIconsOnly) do
+        if btn then
+            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+    end
+    
+    -- ИСПРАВЛЕНО: Показываем контент настроек и все его элементы
     SettingsContent.Visible = true
+    for _, child in pairs(SettingsContent:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") or child:IsA("ScrollingFrame") then
+            child.Visible = true
+        end
+    end
+    
     currentTab = "Settings"
+    
     local totalH = 0
     for _, child in pairs(SettingsContent:GetChildren()) do
         if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
