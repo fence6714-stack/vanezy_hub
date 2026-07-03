@@ -1,6 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С ПОЛНОСТЬЮ ИСПРАВЛЕННЫМИ НАСТРОЙКАМИ
+    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕНИЯМИ
     Координаты сундука: (-55.20, -360.41, 9488.14)
 --]]
 
@@ -449,6 +449,7 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
+-- Функция создания вопросика (ИСПРАВЛЕННАЯ)
 local function createHelpButton(parent, text)
     local helpBtn = Instance.new("TextButton")
     helpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -463,41 +464,87 @@ local function createHelpButton(parent, text)
     helpBtn.Parent = parent
     Instance.new("UICorner", helpBtn).CornerRadius = UDim.new(1, 0)
     
+    -- Тултип создаём в CoreGui чтобы был поверх всего
     local tooltip = Instance.new("Frame")
-    tooltip.Size = UDim2.new(0, 0, 0, 0)
-    tooltip.Position = UDim2.new(0, 20, 0.5, 0)
-    tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    tooltip.Size = UDim2.new(0, 200, 0, 50)
+    tooltip.Position = UDim2.new(0, 0, 0, 0)
+    tooltip.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     tooltip.BorderSizePixel = 0
     tooltip.ClipsDescendants = true
-    tooltip.ZIndex = 25
     tooltip.Visible = false
-    tooltip.Parent = parent
-    Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(60, 60, 60)
+    tooltip.ZIndex = 100
+    tooltip.Parent = MainGui -- В главный GUI чтобы быть поверх всего
+    
+    -- Переливающийся градиент
+    local gradient = Instance.new("UIGradient", tooltip)
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 140, 40)),
+        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255, 60, 100)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60)),
+    })
+    
+    Instance.new("UICorner", tooltip).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", tooltip).Color = Color3.fromRGB(80, 80, 80)
     
     local tooltipText = Instance.new("TextLabel")
-    tooltipText.Size = UDim2.new(1, -10, 1, -4)
-    tooltipText.Position = UDim2.new(0, 5, 0, 2)
+    tooltipText.Size = UDim2.new(1, -12, 1, -6)
+    tooltipText.Position = UDim2.new(0, 6, 0, 3)
     tooltipText.BackgroundTransparency = 1
     tooltipText.Text = text
-    tooltipText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    tooltipText.TextColor3 = Color3.fromRGB(220, 220, 220)
     tooltipText.Font = Enum.Font.Gotham
-    tooltipText.TextSize = 9
+    tooltipText.TextSize = 10
     tooltipText.TextWrapped = true
     tooltipText.TextXAlignment = Enum.TextXAlignment.Left
-    tooltipText.ZIndex = 26
+    tooltipText.ZIndex = 101
     tooltipText.Parent = tooltip
     
     local tooltipOpen = false
     
+    local function updateTooltipPosition()
+        local pos = helpBtn.AbsolutePosition
+        local size = helpBtn.AbsoluteSize
+        tooltip.Position = UDim2.new(0, pos.X + size.X + 5, 0, pos.Y - 10)
+    end
+    
     helpBtn.MouseButton1Click:Connect(function()
         tooltipOpen = not tooltipOpen
         if tooltipOpen then
+            updateTooltipPosition()
             tooltip.Visible = true
-            tooltip:TweenSize(UDim2.new(0, 180, 0, 40), "Out", "Quad", 0.2, true)
+            helpBtn.BackgroundColor3 = Color3.fromRGB(255, 120, 80) -- Подсветка активного
+            tooltip.Size = UDim2.new(0, 0, 0, 50)
+            TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 200, 0, 50)
+            }):Play()
         else
-            tooltip:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.2, true)
+            helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 0, 0, 50)
+            }):Play()
             task.delay(0.2, function() tooltip.Visible = false end)
+        end
+    end)
+    
+    -- Закрытие при клике в другом месте
+    UIS.InputBegan:Connect(function(input)
+        if tooltipOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local pos = input.Position
+            local btnPos = helpBtn.AbsolutePosition
+            local btnSize = helpBtn.AbsoluteSize
+            local tipPos = tooltip.AbsolutePosition
+            local tipSize = tooltip.AbsoluteSize
+            
+            if not (pos.X >= btnPos.X and pos.X <= btnPos.X + btnSize.X and pos.Y >= btnPos.Y and pos.Y <= btnPos.Y + btnSize.Y) and
+               not (pos.X >= tipPos.X and pos.X <= tipPos.X + tipSize.X and pos.Y >= tipPos.Y and pos.Y <= tipPos.Y + tipSize.Y) then
+                tooltipOpen = false
+                helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0, 0, 0, 50)
+                }):Play()
+                task.delay(0.2, function() tooltip.Visible = false end)
+            end
         end
     end)
     
@@ -507,6 +554,7 @@ end
 local Tabs = {
     {Name = "Home", Icon = "🏠"},
     {Name = "Main", Icon = "🎯"},
+    {Name = "Settings", Icon = "⚙️"},
 }
 
 local TabButtons = {}
@@ -515,28 +563,9 @@ local TabIconsOnly = {}
 local currentTab = nil
 
 local function hideAllTabs()
-    -- ИСПРАВЛЕНО: Закрываем панель настроек в боковой панели
-    if settingsOpen then
-        settingsOpen = false
-        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
-    end
-    
-    -- ИСПРАВЛЕНО: Скрываем контент настроек и все его элементы
-    if SettingsContent then 
-        SettingsContent.Visible = false
-        for _, child in pairs(SettingsContent:GetChildren()) do
-            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") or child:IsA("ScrollingFrame") then
-                child.Visible = false
-            end
-        end
-    end
-    
-    -- Скрываем все вкладки
     for _, cnt in pairs(TabContents) do
         if cnt then cnt.Visible = false end
     end
-    
-    -- Сбрасываем стиль кнопок вкладок
     for _, btn in pairs(TabButtons) do
         if btn then
             btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
@@ -629,118 +658,7 @@ for i, tab in ipairs(Tabs) do
     iconBtn.MouseButton1Click:Connect(switchToTab)
 end
 
-local SettingsBtn = Instance.new("TextButton")
-SettingsBtn.Size = UDim2.new(0, 32, 0, 32)
-SettingsBtn.Position = UDim2.new(0, 6, 1, -42)
-SettingsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SettingsBtn.BorderSizePixel = 0
-SettingsBtn.Text = "⚙️"
-SettingsBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-SettingsBtn.Font = Enum.Font.GothamBold
-SettingsBtn.TextSize = 16
-SettingsBtn.ZIndex = 5
-SettingsBtn.Parent = SidePanel
-Instance.new("UICorner", SettingsBtn).CornerRadius = UDim.new(0, 6)
-
-local SettingsExpanded = Instance.new("Frame")
-SettingsExpanded.Size = UDim2.new(0, 0, 0, 32)
-SettingsExpanded.Position = UDim2.new(0, 40, 1, -42)
-SettingsExpanded.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SettingsExpanded.BorderSizePixel = 0
-SettingsExpanded.ClipsDescendants = true
-SettingsExpanded.Parent = SidePanel
-Instance.new("UICorner", SettingsExpanded).CornerRadius = UDim.new(0, 6)
-
-local SettingsExpandedBtn = Instance.new("TextButton")
-SettingsExpandedBtn.Size = UDim2.new(0, 80, 1, 0)
-SettingsExpandedBtn.Position = UDim2.new(0, 0, 0, 0)
-SettingsExpandedBtn.BackgroundTransparency = 1
-SettingsExpandedBtn.Text = "Settings"
-SettingsExpandedBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-SettingsExpandedBtn.Font = Enum.Font.GothamBold
-SettingsExpandedBtn.TextSize = 12
-SettingsExpandedBtn.Parent = SettingsExpanded
-
-local settingsOpen = false
-
-SettingsBtn.MouseButton1Click:Connect(function()
-    settingsOpen = not settingsOpen
-    if settingsOpen then
-        SettingsExpanded:TweenSize(UDim2.new(0, 85, 0, 32), "Out", "Quad", 0.25, true)
-    else
-        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
-    end
-end)
-
-local SettingsContent = Instance.new("ScrollingFrame")
-SettingsContent.Size = UDim2.new(1, 0, 1, 0)
-SettingsContent.BackgroundTransparency = 1
-SettingsContent.ScrollBarThickness = 3
-SettingsContent.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
-SettingsContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-SettingsContent.Visible = false
-SettingsContent.Parent = ContentPanel
-
-local settingsLayout = Instance.new("UIListLayout")
-settingsLayout.Padding = UDim.new(0, 5)
-settingsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-settingsLayout.Parent = SettingsContent
-
-SettingsContent.ChildAdded:Connect(function()
-    local totalH = 0
-    for _, child in pairs(SettingsContent:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
-            totalH = totalH + child.AbsoluteSize.Y + 5
-        end
-    end
-    SettingsContent.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
-end)
-
-SettingsExpandedBtn.MouseButton1Click:Connect(function()
-    -- ИСПРАВЛЕНО: Закрываем панель настроек в боковой панели
-    if settingsOpen then
-        settingsOpen = false
-        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
-    end
-    
-    -- ИСПРАВЛЕНО: Скрываем ВСЕ вкладки
-    for _, cnt in pairs(TabContents) do
-        if cnt then cnt.Visible = false end
-    end
-    
-    -- Сбрасываем стиль всех кнопок
-    for _, btn in pairs(TabButtons) do
-        if btn then
-            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
-        end
-    end
-    for _, btn in pairs(TabIconsOnly) do
-        if btn then
-            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
-        end
-    end
-    
-    -- ИСПРАВЛЕНО: Показываем контент настроек и все его элементы
-    SettingsContent.Visible = true
-    for _, child in pairs(SettingsContent:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") or child:IsA("ScrollingFrame") then
-            child.Visible = true
-        end
-    end
-    
-    currentTab = "Settings"
-    
-    local totalH = 0
-    for _, child in pairs(SettingsContent:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
-            totalH = totalH + child.AbsoluteSize.Y + 5
-        end
-    end
-    SettingsContent.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
-end)
+local SettingsContent = TabContents["Settings"]
 
 local function createSectionHeader(parent, text)
     local header = Instance.new("Frame")
@@ -761,9 +679,17 @@ local function createSectionHeader(parent, text)
     local line = Instance.new("Frame")
     line.Size = UDim2.new(1, 0, 0, 1)
     line.Position = UDim2.new(0, 0, 1, 0)
-    line.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    line.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     line.BorderSizePixel = 0
     line.Parent = header
+    
+    -- Градиент для линии
+    local g = Instance.new("UIGradient", line)
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 120, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 40, 40)),
+    })
 end
 
 createSectionHeader(TabContents["Home"], "Home")
@@ -796,9 +722,9 @@ local function createDivider(parent)
     d.Parent = parent
     local g = Instance.new("UIGradient", d)
     g.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 180, 180)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 80, 80)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 140, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60)),
     })
 end
 
@@ -1472,36 +1398,6 @@ CollapseBtn.MouseButton1Click:Connect(function()
         CollapseBtn.Text = "▶"
         for _, btn in pairs(TabButtons) do btn.Visible = false end
         for _, btn in pairs(TabIconsOnly) do btn.Visible = true end
-        SettingsBtn.Visible = false
-        SettingsExpanded.Visible = false
-        local compactSettings = SidePanel:FindFirstChild("CompactSettings")
-        if not compactSettings then
-            compactSettings = Instance.new("TextButton")
-            compactSettings.Name = "CompactSettings"
-            compactSettings.Size = UDim2.new(0, 32, 0, 32)
-            compactSettings.Position = UDim2.new(0.5, -16, 1, -42)
-            compactSettings.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-            compactSettings.BorderSizePixel = 0
-            compactSettings.Text = "⚙️"
-            compactSettings.TextColor3 = Color3.fromRGB(180, 180, 180)
-            compactSettings.Font = Enum.Font.GothamBold
-            compactSettings.TextSize = 16
-            compactSettings.Parent = SidePanel
-            Instance.new("UICorner", compactSettings).CornerRadius = UDim.new(0, 6)
-            compactSettings.MouseButton1Click:Connect(function()
-                sidebarCollapsed = false
-                SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
-                ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
-                ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-                CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 18, 1, -22), "Out", "Quad", 0.25, true)
-                CollapseBtn.Text = "◀"
-                for _, btn in pairs(TabButtons) do btn.Visible = true end
-                for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
-                SettingsBtn.Visible = true
-                SettingsExpanded.Visible = true
-                compactSettings:Destroy()
-            end)
-        end
     else
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
@@ -1510,10 +1406,6 @@ CollapseBtn.MouseButton1Click:Connect(function()
         CollapseBtn.Text = "◀"
         for _, btn in pairs(TabButtons) do btn.Visible = true end
         for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
-        SettingsBtn.Visible = true
-        SettingsExpanded.Visible = true
-        local cs = SidePanel:FindFirstChild("CompactSettings")
-        if cs then cs:Destroy() end
     end
 end)
 
