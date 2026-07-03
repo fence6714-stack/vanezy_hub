@@ -1,7 +1,6 @@
 --[[
-    VANEZY HUB v2 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С НАСТРОЙКАМИ, АНТИ-АФК, СОХРАНЕНИЕМ, СВОРАЧИВАНИЕМ РАЗДЕЛОВ
-    Координаты сундука: (-55.20, -360.41, 9488.14)
+    VANEZY HUB v1 - Auto Chest Farm
+    ИСПРАВЛЕНИЯ: настройки, иконки, скролл, сворачивание
 --]]
 
 local Players = game:GetService("Players")
@@ -13,33 +12,29 @@ local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Константы
 local chestPosition = Vector3.new(-55.20, -360.41, 9488.14)
 local flyHeight = 500
 local maxFlySpeed = 1000
 
--- Переменные состояния
 getgenv().AutoChest = false
 getgenv().FlyingActive = false
-getgenv().FlySpeedPercent = 52 -- По умолчанию 80%
+getgenv().FlySpeedPercent = 52
 getgenv().AntiAFK = false
-getgenv().AntiAFKTime = 0 -- 0 = навсегда
+getgenv().AntiAFKTime = 0
 getgenv().SaveSettings = false
 getgenv().AntiAFKCoroutine = nil
 getgenv().AntiAFKEndTime = 0
 
--- Функция расчёта скорости
 local function getFlySpeed()
     return math.floor(maxFlySpeed * getgenv().FlySpeedPercent / 100)
 end
 
--- Очистка старого GUI
 if CoreGui:FindFirstChild("VanezyHub") then CoreGui:FindFirstChild("VanezyHub"):Destroy() end
 if CoreGui:FindFirstChild("VanezyNotif") then CoreGui:FindFirstChild("VanezyNotif"):Destroy() end
 if CoreGui:FindFirstChild("VanezyToggle") then CoreGui:FindFirstChild("VanezyToggle"):Destroy() end
 
 -- =============================================
--- СОХРАНЕНИЕ НАСТРОЕК
+-- СОХРАНЕНИЕ
 -- =============================================
 local function saveSettings()
     if not getgenv().SaveSettings then return end
@@ -56,9 +51,7 @@ end
 
 local function loadSettings()
     if not getgenv().SaveSettings then return end
-    local success, data = pcall(function()
-        return readfile("VanezyHub_Settings.json")
-    end)
+    local success, data = pcall(function() return readfile("VanezyHub_Settings.json") end)
     if success and data then
         local settings = game:GetService("HttpService"):JSONDecode(data)
         if settings.flySpeedPercent then getgenv().FlySpeedPercent = settings.flySpeedPercent end
@@ -68,7 +61,6 @@ local function loadSettings()
     end
 end
 
--- Загружаем настройки при старте
 loadSettings()
 
 -- =============================================
@@ -79,7 +71,6 @@ local function startAntiAFK(duration)
     getgenv().AntiAFKEndTime = duration > 0 and (os.time() + duration * 60) or 0
     getgenv().AntiAFKCoroutine = task.spawn(function()
         while getgenv().AntiAFK do
-            -- Проверка времени
             if getgenv().AntiAFKEndTime > 0 and os.time() >= getgenv().AntiAFKEndTime then
                 getgenv().AntiAFK = false
                 getgenv().AntiAFKCoroutine = nil
@@ -87,7 +78,6 @@ local function startAntiAFK(duration)
                 updateAllToggles()
                 break
             end
-            -- Действие анти-АФК
             pcall(function() VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) task.wait(0.1) VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
             task.wait(10)
         end
@@ -235,7 +225,7 @@ function createNotification(title, message, duration, customButtons)
         local noBtn = Instance.new("TextButton")
         noBtn.Size = UDim2.new(1, 0, 1, 0)
         noBtn.BackgroundTransparency = 1
-        noBtn.Text = "❌"
+        noBtn.Text = "✕"
         noBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         noBtn.Font = Enum.Font.GothamBold
         noBtn.TextSize = 20
@@ -297,7 +287,7 @@ UIS.InputChanged:Connect(function(input)
 end)
 
 -- =============================================
--- ГЛАВНЫЙ GUI (420×300)
+-- ГЛАВНЫЙ GUI
 -- =============================================
 local MainGui = Instance.new("ScreenGui")
 MainGui.Name = "VanezyHub"
@@ -461,19 +451,19 @@ ContentPanel.BorderSizePixel = 0
 ContentPanel.ClipsDescendants = true
 ContentPanel.Parent = MainFrame
 
--- Кнопка сворачивания разделов
+-- Кнопка сворачивания разделов (прямо у низа)
 local CollapseBtn = Instance.new("TextButton")
-CollapseBtn.Size = UDim2.new(0, 20, 0, 20)
-CollapseBtn.Position = UDim2.new(0, SIDEBAR_WIDTH - 22, 1, -48)
+CollapseBtn.Size = UDim2.new(0, 24, 0, 24)
+CollapseBtn.Position = UDim2.new(0, SIDEBAR_WIDTH - 24, 1, -24)
 CollapseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 CollapseBtn.BorderSizePixel = 0
 CollapseBtn.Text = "◀"
 CollapseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 CollapseBtn.Font = Enum.Font.GothamBold
-CollapseBtn.TextSize = 10
+CollapseBtn.TextSize = 12
 CollapseBtn.ZIndex = 10
 CollapseBtn.Parent = MainFrame
-Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 5)
 
 local sidebarCollapsed = false
 
@@ -482,7 +472,7 @@ local sidebarCollapsed = false
 -- =============================================
 local Tabs = {
     {Name = "Home", Icon = "🏠"},
-    {Name = "Main", Icon = "⚙️"},
+    {Name = "Main", Icon = "🎯"},
 }
 
 local TabButtons = {}
@@ -490,9 +480,15 @@ local TabContents = {}
 local TabIconsOnly = {}
 local currentTab = nil
 
--- Создание вкладок
+-- Функция скрытия всех вкладок включая Settings
+local function hideAllTabs()
+    for _, cnt in pairs(TabContents) do cnt.Visible = false end
+    SettingsContent.Visible = false
+    for _, btn in pairs(TabButtons) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
+    for _, btn in pairs(TabIconsOnly) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
+end
+
 for i, tab in ipairs(Tabs) do
-    -- Полная кнопка
     local tabBtn = Instance.new("TextButton")
     tabBtn.Size = UDim2.new(1, -14, 0, 34)
     tabBtn.Position = UDim2.new(0, 7, 0, 7 + (i-1) * 40)
@@ -506,7 +502,6 @@ for i, tab in ipairs(Tabs) do
     tabBtn.Parent = SidePanel
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Кнопка только с иконкой
     local iconBtn = Instance.new("TextButton")
     iconBtn.Size = UDim2.new(0, 32, 0, 32)
     iconBtn.Position = UDim2.new(0.5, -16, 0, 7 + (i-1) * 40)
@@ -552,9 +547,7 @@ for i, tab in ipairs(Tabs) do
     local function switchToTab()
         if currentTab == tab.Name then return end
         currentTab = tab.Name
-        for _, cnt in pairs(TabContents) do cnt.Visible = false end
-        for _, btn in pairs(TabButtons) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
-        for _, btn in pairs(TabIconsOnly) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
+        hideAllTabs()
         task.delay(0.05, function()
             content.Visible = true
             tabBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
@@ -584,7 +577,6 @@ SettingsBtn.ZIndex = 5
 SettingsBtn.Parent = SidePanel
 Instance.new("UICorner", SettingsBtn).CornerRadius = UDim.new(0, 6)
 
--- Разворачивающаяся кнопка Settings
 local SettingsExpanded = Instance.new("Frame")
 SettingsExpanded.Size = UDim2.new(0, 0, 0, 32)
 SettingsExpanded.Position = UDim2.new(0, 40, 1, -38)
@@ -642,9 +634,7 @@ SettingsContent.ChildAdded:Connect(function()
 end)
 
 SettingsExpandedBtn.MouseButton1Click:Connect(function()
-    for _, cnt in pairs(TabContents) do cnt.Visible = false end
-    for _, btn in pairs(TabButtons) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
-    for _, btn in pairs(TabIconsOnly) do btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22) btn.TextColor3 = Color3.fromRGB(180, 180, 180) end
+    hideAllTabs()
     SettingsContent.Visible = true
     currentTab = "Settings"
 end)
@@ -743,7 +733,6 @@ createSectionHeader(TabContents["Main"], "Main")
 
 local mainContent = TabContents["Main"]
 
--- Статус
 local statusFrame = Instance.new("Frame")
 statusFrame.Size = UDim2.new(1, -16, 0, 30)
 statusFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -754,13 +743,12 @@ Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0, 6)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, 0, 1, 0)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "⏸ Ожидание"
+statusLabel.Text = "⏸ Waiting"
 statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextSize = 11
 statusLabel.Parent = statusFrame
 
--- Тоггл авто-сундука
 local toggleFrame = Instance.new("Frame")
 toggleFrame.Size = UDim2.new(1, -16, 0, 42)
 toggleFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -772,7 +760,7 @@ local toggleLabel = Instance.new("TextLabel")
 toggleLabel.Size = UDim2.new(0.6, 0, 1, 0)
 toggleLabel.Position = UDim2.new(0, 10, 0, 0)
 toggleLabel.BackgroundTransparency = 1
-toggleLabel.Text = "Avto chest"
+toggleLabel.Text = "Auto chest"
 toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleLabel.Font = Enum.Font.GothamBold
 toggleLabel.TextSize = 13
@@ -795,7 +783,6 @@ toggleDot.BorderSizePixel = 0
 toggleDot.Parent = toggleBg
 Instance.new("UICorner", toggleDot).CornerRadius = UDim.new(1, 0)
 
--- Слайдер скорости (проценты)
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, -16, 0, 46)
 speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -904,7 +891,6 @@ antiAFKToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 antiAFKToggleDot.Parent = antiAFKToggleBg
 Instance.new("UICorner", antiAFKToggleDot).CornerRadius = UDim.new(1, 0)
 
--- Стрелочка для доп настроек
 local antiAFKArrow = Instance.new("TextButton")
 antiAFKArrow.Size = UDim2.new(0, 20, 0, 20)
 antiAFKArrow.Position = UDim2.new(1, -35, 0.5, -10)
@@ -917,7 +903,7 @@ antiAFKArrow.TextSize = 10
 antiAFKArrow.Parent = antiAFKFrame
 Instance.new("UICorner", antiAFKArrow).CornerRadius = UDim.new(0, 4)
 
--- Выпадающий список времени
+-- Выпадающий список (половина высоты, со скроллом)
 local antiAFKDropdown = Instance.new("Frame")
 antiAFKDropdown.Size = UDim2.new(1, -16, 0, 0)
 antiAFKDropdown.Position = UDim2.new(0, 8, 1, 0)
@@ -929,55 +915,64 @@ antiAFKDropdown.ZIndex = 10
 antiAFKDropdown.Parent = SettingsContent
 Instance.new("UICorner", antiAFKDropdown).CornerRadius = UDim.new(0, 6)
 
+-- Внутренний скролл для списка
+local dropdownScroll = Instance.new("ScrollingFrame")
+dropdownScroll.Size = UDim2.new(1, 0, 1, -40)
+dropdownScroll.Position = UDim2.new(0, 0, 0, 0)
+dropdownScroll.BackgroundTransparency = 1
+dropdownScroll.ScrollBarThickness = 3
+dropdownScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+dropdownScroll.CanvasSize = UDim2.new(0, 0, 0, 30 * 10)
+dropdownScroll.Parent = antiAFKDropdown
+
 local dropdownList = Instance.new("UIListLayout")
-dropdownList.Parent = antiAFKDropdown
+dropdownList.Parent = dropdownScroll
 
 local antiAFKOpen = false
 local antiAFKSelectedTime = getgenv().AntiAFKTime
 local confirmButtons = nil
 
--- Функция создания опций времени
 local function createTimeOptions()
-    for _, child in pairs(antiAFKDropdown:GetChildren()) do
-        if child:IsA("TextButton") or child:IsA("Frame") and child ~= antiAFKDropdown:FindFirstChild("UIListLayout") then
-            child:Destroy()
-        end
+    for _, child in pairs(dropdownScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
     end
-    confirmButtons = nil
+    if confirmButtons then confirmButtons:Destroy() confirmButtons = nil end
     
     local times = {0, 40, 60, 80, 100, 120, 140, 160, 180, 200}
     local timeNames = {"Forever", "40 minutes", "60 minutes", "80 minutes", "100 minutes", "120 minutes", "140 minutes", "160 minutes", "180 minutes", "200 minutes"}
     
     for i, t in ipairs(times) do
         local optFrame = Instance.new("Frame")
-        optFrame.Size = UDim2.new(1, 0, 0, 30)
+        optFrame.Size = UDim2.new(1, -4, 0, 28)
         optFrame.BackgroundColor3 = t == antiAFKSelectedTime and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(25, 25, 25)
         optFrame.BorderSizePixel = 0
-        optFrame.Parent = antiAFKDropdown
+        optFrame.Parent = dropdownScroll
         
         local optBtn = Instance.new("TextButton")
-        optBtn.Size = UDim2.new(1, -50, 1, 0)
+        optBtn.Size = UDim2.new(1, -10, 1, 0)
         optBtn.Position = UDim2.new(0, 5, 0, 0)
         optBtn.BackgroundTransparency = 1
         optBtn.Text = timeNames[i]
         optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         optBtn.Font = Enum.Font.Gotham
-        optBtn.TextSize = 11
+        optBtn.TextSize = 10
         optBtn.TextXAlignment = Enum.TextXAlignment.Left
         optBtn.Parent = optFrame
         optBtn.MouseButton1Click:Connect(function()
             antiAFKSelectedTime = t
             createTimeOptions()
-            -- Показываем кнопки подтверждения
             if not confirmButtons then
                 confirmButtons = Instance.new("Frame")
-                confirmButtons.Size = UDim2.new(1, 0, 0, 30)
-                confirmButtons.BackgroundTransparency = 1
+                confirmButtons.Size = UDim2.new(1, 0, 0, 32)
+                confirmButtons.Position = UDim2.new(0, 0, 1, -36)
+                confirmButtons.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+                confirmButtons.BorderSizePixel = 0
+                confirmButtons.ZIndex = 11
                 confirmButtons.Parent = antiAFKDropdown
                 
                 local confirmYes = Instance.new("TextButton")
-                confirmYes.Size = UDim2.new(0, 60, 0, 24)
-                confirmYes.Position = UDim2.new(0.5, -70, 0.5, -12)
+                confirmYes.Size = UDim2.new(0, 55, 0, 24)
+                confirmYes.Position = UDim2.new(0.5, -65, 0.5, -12)
                 confirmYes.BackgroundColor3 = Color3.fromRGB(40, 140, 40)
                 confirmYes.BorderSizePixel = 0
                 confirmYes.Text = "✅"
@@ -991,8 +986,10 @@ local function createTimeOptions()
                     if getgenv().AntiAFK then
                         stopAntiAFK()
                         startAntiAFK(getgenv().AntiAFKTime)
+                        createNotification("Anti AFK", "✅ Anti AFK has been enabled", 4)
+                    else
+                        createNotification("Anti AFK", "✅ Time set. Enable Anti AFK to start.", 4)
                     end
-                    createNotification("Anti AFK", "✅ Activated", 3)
                     antiAFKDropdown.Visible = false
                     antiAFKOpen = false
                     antiAFKArrow.Text = "▼"
@@ -1000,14 +997,14 @@ local function createTimeOptions()
                 end)
                 
                 local confirmNo = Instance.new("TextButton")
-                confirmNo.Size = UDim2.new(0, 60, 0, 24)
+                confirmNo.Size = UDim2.new(0, 55, 0, 24)
                 confirmNo.Position = UDim2.new(0.5, 10, 0.5, -12)
                 confirmNo.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
                 confirmNo.BorderSizePixel = 0
-                confirmNo.Text = "x"
+                confirmNo.Text = "✕"
                 confirmNo.TextColor3 = Color3.fromRGB(255, 255, 255)
                 confirmNo.Font = Enum.Font.GothamBold
-                confirmNo.TextSize = 14
+                confirmNo.TextSize = 16
                 confirmNo.Parent = confirmButtons
                 Instance.new("UICorner", confirmNo).CornerRadius = UDim.new(0, 6)
                 Instance.new("UIStroke", confirmNo).Color = Color3.fromRGB(255, 0, 0)
@@ -1015,8 +1012,7 @@ local function createTimeOptions()
                 confirmNo.MouseButton1Click:Connect(function()
                     antiAFKSelectedTime = getgenv().AntiAFKTime
                     createTimeOptions()
-                    confirmButtons:Destroy()
-                    confirmButtons = nil
+                    if confirmButtons then confirmButtons:Destroy() confirmButtons = nil end
                 end)
             end
         end)
@@ -1029,7 +1025,7 @@ antiAFKArrow.MouseButton1Click:Connect(function()
     antiAFKOpen = not antiAFKOpen
     if antiAFKOpen then
         antiAFKDropdown.Visible = true
-        antiAFKDropdown:TweenSize(UDim2.new(1, -16, 0, 30 * 10 + 40), "Out", "Quad", 0.2, true)
+        antiAFKDropdown:TweenSize(UDim2.new(1, -16, 0, 160), "Out", "Quad", 0.2, true)
         antiAFKArrow.Text = "▲"
     else
         antiAFKDropdown:TweenSize(UDim2.new(1, -16, 0, 0), "Out", "Quad", 0.2, true)
@@ -1072,7 +1068,7 @@ saveToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 saveToggleDot.Parent = saveToggleBg
 Instance.new("UICorner", saveToggleDot).CornerRadius = UDim.new(1, 0)
 
--- Reset All Settings
+-- Reset
 local resetFrame = Instance.new("Frame")
 resetFrame.Size = UDim2.new(1, -16, 0, 36)
 resetFrame.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
@@ -1090,10 +1086,9 @@ resetBtn.TextSize = 12
 resetBtn.Parent = resetFrame
 
 -- =============================================
--- ФУНКЦИЯ ОБНОВЛЕНИЯ ВСЕХ ТОГГЛОВ
+-- ОБНОВЛЕНИЕ ТОГГЛОВ
 -- =============================================
 local function updateAllToggles()
-    -- Main toggle
     if getgenv().AutoChest then
         toggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         toggleDot.Position = UDim2.new(1, -22, 0.5, -10)
@@ -1106,7 +1101,6 @@ local function updateAllToggles()
         StatusToggleDot.Position = UDim2.new(0, 2, 0.5, -7)
     end
     
-    -- Anti AFK toggle
     if getgenv().AntiAFK then
         antiAFKToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         antiAFKToggleDot.Position = UDim2.new(1, -22, 0.5, -10)
@@ -1115,7 +1109,6 @@ local function updateAllToggles()
         antiAFKToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
     end
     
-    -- Save toggle
     if getgenv().SaveSettings then
         saveToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         saveToggleDot.Position = UDim2.new(1, -22, 0.5, -10)
@@ -1125,44 +1118,36 @@ local function updateAllToggles()
     end
 end
 
--- Применяем начальное состояние
 updateAllToggles()
 
 -- =============================================
--- ОБРАБОТЧИКИ ТОГГЛОВ
+-- ОБРАБОТЧИКИ
 -- =============================================
-
--- Основной тоггл авто-сундука
 toggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AutoChest = not getgenv().AutoChest
         updateAllToggles()
         updateStatusBar()
         if getgenv().AutoChest then
-            statusLabel.Text = "🚀 Запуск..."
-            StatusText.Text = "🚀 Запуск..."
-            if not getgenv().FlyingActive and isAwayFromChest() then
-                flyToChest()
-            end
+            statusLabel.Text = "🚀 Starting..."
+            StatusText.Text = "🚀 Starting..."
+            if not getgenv().FlyingActive and isAwayFromChest() then flyToChest() end
         else
             stopFlying()
-            statusLabel.Text = "⏸ Остановлен"
-            StatusText.Text = "⏸ Остановлен"
+            statusLabel.Text = "⏸ Stopped"
+            StatusText.Text = "⏸ Stopped"
         end
         saveSettings()
     end
 end)
 
--- Мини-тоггл в статус-баре
 StatusToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AutoChest = not getgenv().AutoChest
         updateAllToggles()
         updateStatusBar()
         if getgenv().AutoChest then
-            if not getgenv().FlyingActive and isAwayFromChest() then
-                flyToChest()
-            end
+            if not getgenv().FlyingActive and isAwayFromChest() then flyToChest() end
         else
             stopFlying()
         end
@@ -1170,13 +1155,13 @@ StatusToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Anti AFK toggle
 antiAFKToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AntiAFK = not getgenv().AntiAFK
         updateAllToggles()
         if getgenv().AntiAFK then
             startAntiAFK(getgenv().AntiAFKTime)
+            createNotification("Anti AFK", "✅ Anti AFK has been enabled", 4)
         else
             stopAntiAFK()
         end
@@ -1184,31 +1169,27 @@ antiAFKToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Save Settings toggle
 saveToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().SaveSettings = not getgenv().SaveSettings
         updateAllToggles()
-        if getgenv().SaveSettings then
-            saveSettings()
-        end
+        if getgenv().SaveSettings then saveSettings() end
     end
 end)
 
--- Reset All Settings
 resetBtn.MouseButton1Click:Connect(function()
     local nf, yesBtn, noBtn, closeNotif = createNotification("Reset Settings", "Are you sure you want to reset all settings?", 10, true)
     yesBtn.MouseButton1Click:Connect(function()
         closeNotif()
-        getgenv().FlySpeedPercent = 80
+        getgenv().FlySpeedPercent = 52
         getgenv().AntiAFK = false
         getgenv().AntiAFKTime = 0
         getgenv().SaveSettings = false
         stopAntiAFK()
         updateAllToggles()
-        speedLabel.Text = "Скорость: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")"
-        sliderFill.Size = UDim2.new(getgenv().FlySpeedPercent / 100, 0, 1, 0)
-        sliderDot.Position = UDim2.new(getgenv().FlySpeedPercent / 100, -7, 0, -4)
+        speedLabel.Text = "Speed: 52% (520)"
+        sliderFill.Size = UDim2.new(0.52, 0, 1, 0)
+        sliderDot.Position = UDim2.new(0.52, -7, 0, -4)
         antiAFKSelectedTime = 0
         createTimeOptions()
         pcall(function() delfile("VanezyHub_Settings.json") end)
@@ -1237,8 +1218,8 @@ local function stopFlying()
             if part:IsA("BasePart") then part.LocalTransparencyModifier = 0 part.CanCollide = true end
         end
     end
-    statusLabel.Text = "⏸ Остановлен"
-    StatusText.Text = "⏸ Остановлен"
+    statusLabel.Text = "⏸ Stopped"
+    StatusText.Text = "⏸ Stopped"
 end
 
 function isAwayFromChest()
@@ -1253,8 +1234,8 @@ local function flyToChest()
     flyCoroutine = task.spawn(function()
         local char = Player.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
-            statusLabel.Text = "❌ Нет персонажа"
-            StatusText.Text = "❌ Нет персонажа"
+            statusLabel.Text = "❌ No character"
+            StatusText.Text = "❌ No character"
             getgenv().FlyingActive = false
             return
         end
@@ -1263,8 +1244,8 @@ local function flyToChest()
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then part.LocalTransparencyModifier = 0.5 part.CanCollide = false end
         end
-        statusLabel.Text = "👻 Невидим + Ноклип"
-        StatusText.Text = "👻 Невидим + Ноклип"
+        statusLabel.Text = "👻 Invisible + Noclip"
+        StatusText.Text = "👻 Invisible + Noclip"
         local bv = Instance.new("BodyVelocity")
         bv.Name = "FlyVelocity"
         bv.MaxForce = Vector3.new(400000, 400000, 400000)
@@ -1279,8 +1260,8 @@ local function flyToChest()
         bg.Parent = hrp
         hum.PlatformStand = true
         local targetAbove = chestPosition + Vector3.new(0, flyHeight, 0)
-        statusLabel.Text = "🔼 Летим к сундуку..."
-        StatusText.Text = "🔼 Летим к сундуку..."
+        statusLabel.Text = "🔼 Flying to chest..."
+        StatusText.Text = "🔼 Flying..."
         local currentSpeed = getFlySpeed()
         local phase1Done = false
         while getgenv().FlyingActive and not phase1Done do
@@ -1299,14 +1280,13 @@ local function flyToChest()
             task.wait()
         end
         if not getgenv().FlyingActive then return end
-        -- Проверка смерти
         if hum and hum.Health <= 0 then
             getgenv().FlyingActive = false
-            StatusText.Text = "💀 Умер, жду респавн..."
+            StatusText.Text = "💀 Dead, waiting..."
             return
         end
-        statusLabel.Text = "🔽 Снижаюсь к сундуку..."
-        StatusText.Text = "🔽 Снижаюсь к сундуку..."
+        statusLabel.Text = "🔽 Descending..."
+        StatusText.Text = "🔽 Descending..."
         task.wait(0.2)
         local phase2Done = false
         while getgenv().FlyingActive and not phase2Done do
@@ -1333,27 +1313,24 @@ local function flyToChest()
             if part:IsA("BasePart") then part.LocalTransparencyModifier = 0 part.CanCollide = true end
         end
         getgenv().FlyingActive = false
-        -- Проверка смерти
         if hum and hum.Health <= 0 then
-            StatusText.Text = "💀 Умер, жду респавн..."
+            StatusText.Text = "💀 Dead, waiting..."
             return
         end
-        statusLabel.Text = "🎯 У сундука! Жду..."
-        StatusText.Text = "🎯 У сундука! Жду..."
+        statusLabel.Text = "🎯 At chest! Waiting..."
+        StatusText.Text = "🎯 At chest!"
         while getgenv().AutoChest and not isAwayFromChest() do
             local c = Player.Character
             if c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChild("Humanoid") then
                 local dist = (c.HumanoidRootPart.Position - chestPosition).Magnitude
-                if dist > 3 and dist < 10 then
-                    c.HumanoidRootPart.CFrame = CFrame.new(chestPosition)
-                end
+                if dist > 3 and dist < 10 then c.HumanoidRootPart.CFrame = CFrame.new(chestPosition) end
                 if c.Humanoid.Health <= 0 then break end
             end
             task.wait(0.5)
         end
         if getgenv().AutoChest and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character.Humanoid.Health > 0 then
-            statusLabel.Text = "🔄 Отдалился >10, цикл заново..."
-            StatusText.Text = "🔄 Новый цикл..."
+            statusLabel.Text = "🔄 Moved >10, restarting..."
+            StatusText.Text = "🔄 Restarting..."
         end
     end)
 end
@@ -1370,15 +1347,13 @@ function updateStatusBar()
         StatusBar.Position = UDim2.new(1, -240, 0, 4)
         StatusBar.BackgroundTransparency = 0
         if getgenv().AutoChest then
-            if not getgenv().FlyingActive and not isAwayFromChest() then
-                StatusText.Text = "🎯 У сундука"
-            elseif not getgenv().FlyingActive then
-                StatusText.Text = "🔄 Готов к полёту"
+            if not getgenv().FlyingActive and not isAwayFromChest() then StatusText.Text = "🎯 At chest"
+            elseif not getgenv().FlyingActive then StatusText.Text = "🔄 Ready"
             end
             StatusToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
             StatusToggleDot.Position = UDim2.new(1, -16, 0.5, -7)
         else
-            StatusText.Text = "⏸ Остановлен"
+            StatusText.Text = "⏸ Stopped"
             StatusToggleBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             StatusToggleDot.Position = UDim2.new(0, 2, 0.5, -7)
         end
@@ -1395,18 +1370,15 @@ end
 CollapseBtn.MouseButton1Click:Connect(function()
     sidebarCollapsed = not sidebarCollapsed
     if sidebarCollapsed then
-        -- Сворачиваем
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_COLLAPSED_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH - 10, 1, -48), "Out", "Quad", 0.25, true)
+        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_COLLAPSED_WIDTH - 10, 1, -24), "Out", "Quad", 0.25, true)
         CollapseBtn.Text = "▶"
-        -- Показываем только иконки
-        for name, btn in pairs(TabButtons) do btn.Visible = false end
-        for name, btn in pairs(TabIconsOnly) do btn.Visible = true end
+        for _, btn in pairs(TabButtons) do btn.Visible = false end
+        for _, btn in pairs(TabIconsOnly) do btn.Visible = true end
         SettingsBtn.Visible = false
         SettingsExpanded.Visible = false
-        -- Компактная кнопка настроек
         local compactSettings = SidePanel:FindFirstChild("CompactSettings")
         if not compactSettings then
             compactSettings = Instance.new("TextButton")
@@ -1426,10 +1398,10 @@ CollapseBtn.MouseButton1Click:Connect(function()
                 SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
                 ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
                 ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-                CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 22, 1, -48), "Out", "Quad", 0.25, true)
+                CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 24, 1, -24), "Out", "Quad", 0.25, true)
                 CollapseBtn.Text = "◀"
-                for name, btn in pairs(TabButtons) do btn.Visible = true end
-                for name, btn in pairs(TabIconsOnly) do btn.Visible = false end
+                for _, btn in pairs(TabButtons) do btn.Visible = true end
+                for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
                 SettingsBtn.Visible = true
                 SettingsExpanded.Visible = true
                 compactSettings:Destroy()
@@ -1439,14 +1411,14 @@ CollapseBtn.MouseButton1Click:Connect(function()
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
-        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 22, 1, -48), "Out", "Quad", 0.25, true)
+        CollapseBtn:TweenPosition(UDim2.new(0, SIDEBAR_WIDTH - 24, 1, -24), "Out", "Quad", 0.25, true)
         CollapseBtn.Text = "◀"
-        for name, btn in pairs(TabButtons) do btn.Visible = true end
-        for name, btn in pairs(TabIconsOnly) do btn.Visible = false end
+        for _, btn in pairs(TabButtons) do btn.Visible = true end
+        for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
         SettingsBtn.Visible = true
         SettingsExpanded.Visible = true
-        local compactSettings = SidePanel:FindFirstChild("CompactSettings")
-        if compactSettings then compactSettings:Destroy() end
+        local cs = SidePanel:FindFirstChild("CompactSettings")
+        if cs then cs:Destroy() end
     end
 end)
 
@@ -1475,17 +1447,12 @@ end)
 local guiVisible = true
 ToggleBtn.MouseButton1Click:Connect(function()
     if guiVisible then
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            BackgroundTransparency = 1,
-        }):Play()
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, GUI_WIDTH, 0, 0),
-            Position = UDim2.new(0, 40, 0.5, 0)
+            Size = UDim2.new(0, GUI_WIDTH, 0, 0), Position = UDim2.new(0, 40, 0.5, 0)
         }):Play()
         task.delay(0.4, function() MainGui.Enabled = false end)
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-        }):Play()
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(90, 90, 90)}):Play()
         guiVisible = false
     else
         MainGui.Enabled = true
@@ -1493,13 +1460,9 @@ ToggleBtn.MouseButton1Click:Connect(function()
         MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, 0)
         MainFrame.Position = UDim2.new(0, 40, 0.5, 0)
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0,
-            Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT),
-            Position = UDim2.new(0, 40, 0.5, -GUI_HEIGHT/2)
+            BackgroundTransparency = 0, Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT), Position = UDim2.new(0, 40, 0.5, -GUI_HEIGHT/2)
         }):Play()
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        }):Play()
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}):Play()
         guiVisible = true
     end
 end)
@@ -1515,7 +1478,6 @@ local function showGoodbyeAndClose()
         ContentPanel.Visible = false
         Header.Visible = false
         CollapseBtn.Visible = false
-        
         local goodbyeText = Instance.new("TextLabel")
         goodbyeText.Size = UDim2.new(1, 0, 0, 50)
         goodbyeText.Position = UDim2.new(0, 0, 0.5, -25)
@@ -1526,32 +1488,16 @@ local function showGoodbyeAndClose()
         goodbyeText.TextSize = 24
         goodbyeText.TextTransparency = 1
         goodbyeText.Parent = MainFrame
-        
-        TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            TextTransparency = 0
-        }):Play()
-        
+        TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
         task.delay(4, function()
-            TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                TextTransparency = 1
-            }):Play()
-            TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1
-            }):Play()
-            TweenService:Create(ToggleBtn, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1
-            }):Play()
+            TweenService:Create(goodbyeText, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1}):Play()
+            TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(ToggleBtn, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
         end)
-        
-        task.delay(7, function()
-            MainGui:Destroy()
-            NotifGui:Destroy()
-            ToggleBtnGui:Destroy()
-        end)
+        task.delay(7, function() MainGui:Destroy() NotifGui:Destroy() ToggleBtnGui:Destroy() end)
     end)
     noBtn.MouseButton1Click:Connect(function() closeNotif() end)
 end
-
 CloseBtn.MouseButton1Click:Connect(showGoodbyeAndClose)
 
 -- =============================================
@@ -1564,32 +1510,25 @@ if TabContents["Home"] then
         TabButtons["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
         TabButtons["Home"].TextColor3 = Color3.fromRGB(255, 255, 255)
     end
-    if TabIconsOnly["Home"] then
-        TabIconsOnly["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-    end
+    if TabIconsOnly["Home"] then TabIconsOnly["Home"].BackgroundColor3 = Color3.fromRGB(255, 80, 80) end
 end
 
--- Респавн — перезапуск цикла
 Player.CharacterAdded:Connect(function(char)
     if getgenv().AutoChest then
         task.wait(0.5)
-        if not getgenv().FlyingActive and isAwayFromChest() then
-            flyToChest()
-        end
+        if not getgenv().FlyingActive and isAwayFromChest() then flyToChest() end
     end
 end)
 
--- Отслеживание смерти
 Player.CharacterRemoving:Connect(function(char)
     if getgenv().FlyingActive then
         getgenv().FlyingActive = false
         if flyCoroutine then task.cancel(flyCoroutine) flyCoroutine = nil end
-        StatusText.Text = "💀 Умер, жду респавн..."
-        statusLabel.Text = "💀 Умер, жду респавн..."
+        StatusText.Text = "💀 Dead, waiting..."
+        statusLabel.Text = "💀 Dead, waiting..."
     end
 end)
 
--- Основной цикл
 task.spawn(function()
     while true do
         if getgenv().AutoChest and not getgenv().FlyingActive and isAwayFromChest() then
@@ -1612,22 +1551,16 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Обновление статус-бара
 task.spawn(function()
     while true do
         if isMinimized and getgenv().AutoChest and not getgenv().FlyingActive then
-            if not isAwayFromChest() then
-                StatusText.Text = "🎯 У сундука"
-            else
-                StatusText.Text = "🔄 Готов к полёту"
-            end
+            if not isAwayFromChest() then StatusText.Text = "🎯 At chest"
+            else StatusText.Text = "🔄 Ready" end
         end
         task.wait(1)
     end
 end)
 
 task.wait(0.5)
-createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
-
-print("Vanezy Hub v2 загружен!")
-print("Скорость по умолчанию: 52% (" .. getFlySpeed() .. ")")
+createNotification("Notification", "Script by Vanezy Scripts team", 5)
+print("Vanezy Hub v1 loaded! Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
