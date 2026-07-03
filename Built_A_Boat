@@ -1,6 +1,6 @@
 --[[
-    VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С ФИНАЛЬНЫМИ ИСПРАВЛЕНИЯМИ
+    ≤V≥ Hub v1 - Auto Chest Farm
+    ПОЛНЫЙ СКРИПТ С ГРАДИЕНТАМИ И АНИМАЦИЯМИ
 --]]
 
 local Players = game:GetService("Players")
@@ -29,9 +29,9 @@ local function getFlySpeed()
     return math.floor(maxFlySpeed * getgenv().FlySpeedPercent / 100)
 end
 
-if CoreGui:FindFirstChild("VanezyHub") then CoreGui:FindFirstChild("VanezyHub"):Destroy() end
-if CoreGui:FindFirstChild("VanezyNotif") then CoreGui:FindFirstChild("VanezyNotif"):Destroy() end
-if CoreGui:FindFirstChild("VanezyToggle") then CoreGui:FindFirstChild("VanezyToggle"):Destroy() end
+if CoreGui:FindFirstChild("VHub") then CoreGui:FindFirstChild("VHub"):Destroy() end
+if CoreGui:FindFirstChild("VHubNotif") then CoreGui:FindFirstChild("VHubNotif"):Destroy() end
+if CoreGui:FindFirstChild("VHubToggle") then CoreGui:FindFirstChild("VHubToggle"):Destroy() end
 
 local function saveSettings()
     if not getgenv().SaveSettings then return end
@@ -42,13 +42,13 @@ local function saveSettings()
         saveSettings = getgenv().SaveSettings,
     }
     pcall(function()
-        writefile("VanezyHub_Settings.json", game:GetService("HttpService"):JSONEncode(settings))
+        writefile("VHub_Settings.json", game:GetService("HttpService"):JSONEncode(settings))
     end)
 end
 
 local function loadSettings()
     if not getgenv().SaveSettings then return end
-    local success, data = pcall(function() return readfile("VanezyHub_Settings.json") end)
+    local success, data = pcall(function() return readfile("VHub_Settings.json") end)
     if success and data then
         local settings = game:GetService("HttpService"):JSONDecode(data)
         if settings.flySpeedPercent then getgenv().FlySpeedPercent = settings.flySpeedPercent end
@@ -85,8 +85,11 @@ local function stopAntiAFK()
     end
 end
 
+-- =============================================
+-- УВЕДОМЛЕНИЯ (С ГРАДИЕНТОМ)
+-- =============================================
 local NotifGui = Instance.new("ScreenGui")
-NotifGui.Name = "VanezyNotif"
+NotifGui.Name = "VHubNotif"
 NotifGui.ResetOnSpawn = false
 NotifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 NotifGui.DisplayOrder = 999
@@ -124,6 +127,42 @@ function createNotification(title, message, duration, customButtons)
     Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", nf).Color = Color3.fromRGB(40, 40, 40)
     Instance.new("UIStroke", nf).Thickness = 1
+    
+    -- Градиент уведомления (появляется плавно 2 сек)
+    local notifGradient = Instance.new("UIGradient", nf)
+    notifGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 100, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 180, 255)),
+    })
+    notifGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    
+    -- Анимация появления градиента 2 сек
+    TweenService:Create(notifGradient, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 0),
+        })
+    }):Play()
+    
+    -- Анимация переливания
+    local hue = 0
+    task.spawn(function()
+        while nf and nf.Parent do
+            hue = (hue + 0.003) % 1
+            pcall(function()
+                notifGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.5, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.5, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.5, 1)),
+                })
+            end)
+            task.wait(0.05)
+        end
+    end)
     
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, customButtons and -12 or -35, 0, 20)
@@ -244,8 +283,55 @@ function copyToClipboard(text, label)
     end
 end
 
+-- =============================================
+-- WELCOME ЭКРАН
+-- =============================================
+local WelcomeGui = Instance.new("ScreenGui")
+WelcomeGui.Name = "VHubWelcome"
+WelcomeGui.ResetOnSpawn = false
+WelcomeGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+WelcomeGui.DisplayOrder = 1000
+WelcomeGui.Parent = CoreGui
+
+local WelcomeFrame = Instance.new("Frame")
+WelcomeFrame.Size = UDim2.new(0, 300, 0, 60)
+WelcomeFrame.Position = UDim2.new(0.5, -150, 0.5, -30)
+WelcomeFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+WelcomeFrame.BorderSizePixel = 0
+WelcomeFrame.BackgroundTransparency = 1
+WelcomeFrame.Parent = WelcomeGui
+Instance.new("UICorner", WelcomeFrame).CornerRadius = UDim.new(0, 12)
+
+local WelcomeText = Instance.new("TextLabel")
+WelcomeText.Size = UDim2.new(1, 0, 1, 0)
+WelcomeText.BackgroundTransparency = 1
+WelcomeText.Text = "Welcome ≤V≥ hub"
+WelcomeText.TextColor3 = Color3.fromRGB(255, 80, 80)
+WelcomeText.Font = Enum.Font.GothamBlack
+WelcomeText.TextSize = 28
+WelcomeText.TextTransparency = 1
+WelcomeText.Parent = WelcomeFrame
+
+-- Анимация: появление 2.5 сек, затем исчезновение 2.5 сек
+TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    TextTransparency = 0
+}):Play()
+
+task.delay(2.5, function()
+    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        TextTransparency = 1
+    }):Play()
+end)
+
+task.delay(5, function()
+    WelcomeGui:Destroy()
+end)
+
+-- =============================================
+-- КРУГЛАЯ КНОПКА
+-- =============================================
 local ToggleBtnGui = Instance.new("ScreenGui")
-ToggleBtnGui.Name = "VanezyToggle"
+ToggleBtnGui.Name = "VHubToggle"
 ToggleBtnGui.ResetOnSpawn = false
 ToggleBtnGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ToggleBtnGui.Parent = CoreGui
@@ -279,8 +365,11 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
+-- =============================================
+-- ГЛАВНЫЙ GUI (С ГРАДИЕНТОМ, ПОЯВЛЯЕТСЯ ПОСЛЕ WELCOME 5 СЕК)
+-- =============================================
 local MainGui = Instance.new("ScreenGui")
-MainGui.Name = "VanezyHub"
+MainGui.Name = "VHub"
 MainGui.ResetOnSpawn = false
 MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 MainGui.Parent = CoreGui
@@ -298,15 +387,58 @@ MainFrame.BackgroundTransparency = 1
 MainFrame.Parent = MainGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
 
+-- Градиент главного GUI (появляется 5 сек)
+local mainGradient = Instance.new("UIGradient", MainFrame)
+mainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 70)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 150, 60)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 90, 70)),
+})
+mainGradient.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(1, 1),
+})
+
+-- Анимация переливания градиента GUI
+local guiHue = 0
+task.spawn(function()
+    while MainFrame and MainFrame.Parent do
+        guiHue = (guiHue + 0.002) % 1
+        pcall(function()
+            mainGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromHSV(guiHue, 0.7, 0.9)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromHSV((guiHue + 0.3) % 1, 0.7, 0.9)),
+                ColorSequenceKeypoint.new(1, Color3.fromHSV((guiHue + 0.6) % 1, 0.7, 0.9)),
+            })
+        end)
+        task.wait(0.05)
+    end
+end)
+
+-- Появление GUI после welcome (5 сек задержка, затем 5 сек появление)
 MainFrame.BackgroundTransparency = 1
 MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, 0)
 MainFrame.Position = UDim2.new(0, 25, 0.5, 0)
-TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-    BackgroundTransparency = 0,
-    Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT),
-    Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT/2)
-}):Play()
 
+task.delay(5, function()
+    TweenService:Create(MainFrame, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        BackgroundTransparency = 0,
+        Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT),
+        Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT/2)
+    }):Play()
+    
+    -- Градиент появляется плавно 5 сек
+    TweenService:Create(mainGradient, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 0),
+        })
+    }):Play()
+end)
+
+-- =============================================
+-- ЗАГОЛОВОК
+-- =============================================
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 48)
 Header.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -331,7 +463,7 @@ local HubTitle = Instance.new("TextLabel")
 HubTitle.Size = UDim2.new(1, -95, 0, 22)
 HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
-HubTitle.Text = "Vanezy Hub v1"
+HubTitle.Text = "≤V≥ Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
@@ -461,7 +593,9 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
--- Список всех открытых тултипов для закрытия при клике в любом месте
+-- =============================================
+-- ТУЛТИПЫ (С ГРАДИЕНТОМ 2 СЕК)
+-- =============================================
 local allTooltips = {}
 
 local function closeAllTooltips()
@@ -484,7 +618,6 @@ local function closeAllTooltips()
     allTooltips = {}
 end
 
--- Глобальный обработчик кликов для закрытия тултипов
 UIS.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         closeAllTooltips()
@@ -514,17 +647,28 @@ local function createHelpButton(parent, text)
     tooltip.ZIndex = 100
     tooltip.Parent = MainGui
     
-    local gradient = Instance.new("UIGradient", tooltip)
-    local hue = 0
+    -- Градиент тултипа (появляется плавно 2 сек)
+    local tipGradient = Instance.new("UIGradient", tooltip)
+    tipGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 100)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 160, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 80, 100)),
+    })
+    tipGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    
+    local tipHue = 0
     task.spawn(function()
-        while true do
-            if not tooltip.Visible or not tooltip.Parent then task.wait(0.5) continue end
-            hue = (hue + 0.005) % 1
+        while tooltip and tooltip.Parent do
+            if not tooltip.Visible then task.wait(0.5) continue end
+            tipHue = (tipHue + 0.005) % 1
             pcall(function()
-                gradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
+                tipGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(tipHue, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((tipHue + 0.3) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((tipHue + 0.6) % 1, 0.8, 1)),
                 })
             end)
             task.wait(0.05)
@@ -560,7 +704,6 @@ local function createHelpButton(parent, text)
     end
     
     helpBtn.MouseButton1Click:Connect(function()
-        -- Закрываем все другие тултипы
         closeAllTooltips()
         
         tooltipData.tooltipOpen = not tooltipData.tooltipOpen
@@ -571,6 +714,13 @@ local function createHelpButton(parent, text)
             tooltip.Size = UDim2.new(0, 0, 0, 50)
             TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 200, 0, 50)
+            }):Play()
+            -- Градиент появляется 2 сек
+            TweenService:Create(tipGradient, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0),
+                    NumberSequenceKeypoint.new(1, 0),
+                })
             }):Play()
             table.insert(allTooltips, tooltipData)
         else
@@ -585,6 +735,9 @@ local function createHelpButton(parent, text)
     return helpBtn
 end
 
+-- =============================================
+-- ВКЛАДКИ
+-- =============================================
 local Tabs = {
     {Name = "Home", Icon = "🏠"},
     {Name = "Main", Icon = "🎯"},
@@ -674,14 +827,12 @@ for i, tab in ipairs(Tabs) do
         if currentTab == tab.Name then return end
         currentTab = tab.Name
         
-        -- Анимация переключения: скрываем старый, показываем новый с задержкой
         local oldContent = nil
         for _, cnt in pairs(TabContents) do
             if cnt.Visible then oldContent = cnt break end
         end
         
         if oldContent then
-            -- Плавно скрываем старый
             TweenService:Create(oldContent, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1
             }):Play()
@@ -689,7 +840,6 @@ for i, tab in ipairs(Tabs) do
         
         hideAllTabs()
         
-        -- Плавно показываем новый
         content.BackgroundTransparency = 1
         content.Visible = true
         TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -716,37 +866,34 @@ end
 
 -- Обработчик шестерёнки в заголовке
 HeaderSettingsBtn.MouseButton1Click:Connect(function()
-    if TabContents["Settings"] and TabButtons["Settings"] then
-        local switchFunc = TabButtons["Settings"].MouseButton1Click
-        -- Вызываем переключение на Settings
-        if currentTab ~= "Settings" then
-            currentTab = "Settings"
-            hideAllTabs()
-            local content = TabContents["Settings"]
-            content.BackgroundTransparency = 1
-            content.Visible = true
-            TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundTransparency = 0
-            }):Play()
-            TabButtons["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            TabButtons["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
-            if TabIconsOnly["Settings"] then
-                TabIconsOnly["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-                TabIconsOnly["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
-            end
-            local totalH = 0
-            for _, child in pairs(content:GetChildren()) do
-                if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
-                    totalH = totalH + child.AbsoluteSize.Y + 5
-                end
-            end
-            content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
+    if currentTab ~= "Settings" then
+        currentTab = "Settings"
+        hideAllTabs()
+        local content = TabContents["Settings"]
+        content.BackgroundTransparency = 1
+        content.Visible = true
+        TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0
+        }):Play()
+        TabButtons["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        TabButtons["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
+        if TabIconsOnly["Settings"] then
+            TabIconsOnly["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+            TabIconsOnly["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
         end
+        local totalH = 0
+        for _, child in pairs(content:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+                totalH = totalH + child.AbsoluteSize.Y + 5
+            end
+        end
+        content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
     end
 end)
 
-local SettingsContent = TabContents["Settings"]
-
+-- =============================================
+-- ЗАГОЛОВКИ РАЗДЕЛОВ
+-- =============================================
 local function createSectionHeader(parent, text)
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, -16, 0, 22)
@@ -970,13 +1117,13 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
-createSectionHeader(SettingsContent, "Settings")
+createSectionHeader(TabContents["Settings"], "Settings")
 
 local antiAFKFrame = Instance.new("Frame")
 antiAFKFrame.Size = UDim2.new(1, -16, 0, 42)
 antiAFKFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
 antiAFKFrame.BorderSizePixel = 0
-antiAFKFrame.Parent = SettingsContent
+antiAFKFrame.Parent = TabContents["Settings"]
 Instance.new("UICorner", antiAFKFrame).CornerRadius = UDim.new(0, 6)
 
 local antiAFKLabel = Instance.new("TextLabel")
@@ -1027,7 +1174,7 @@ antiAFKDropdown.BorderSizePixel = 0
 antiAFKDropdown.ClipsDescendants = true
 antiAFKDropdown.Visible = false
 antiAFKDropdown.ZIndex = 10
-antiAFKDropdown.Parent = SettingsContent
+antiAFKDropdown.Parent = TabContents["Settings"]
 Instance.new("UICorner", antiAFKDropdown).CornerRadius = UDim.new(0, 6)
 
 local dropdownScroll = Instance.new("ScrollingFrame")
@@ -1158,7 +1305,7 @@ local saveFrame = Instance.new("Frame")
 saveFrame.Size = UDim2.new(1, -16, 0, 42)
 saveFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
 saveFrame.BorderSizePixel = 0
-saveFrame.Parent = SettingsContent
+saveFrame.Parent = TabContents["Settings"]
 Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 6)
 
 local saveLabel = Instance.new("TextLabel")
@@ -1193,7 +1340,7 @@ local resetFrame = Instance.new("Frame")
 resetFrame.Size = UDim2.new(1, -16, 0, 36)
 resetFrame.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
 resetFrame.BorderSizePixel = 0
-resetFrame.Parent = SettingsContent
+resetFrame.Parent = TabContents["Settings"]
 Instance.new("UICorner", resetFrame).CornerRadius = UDim.new(0, 6)
 
 local resetBtn = Instance.new("TextButton")
@@ -1205,6 +1352,9 @@ resetBtn.Font = Enum.Font.GothamBold
 resetBtn.TextSize = 12
 resetBtn.Parent = resetFrame
 
+-- =============================================
+-- ОБНОВЛЕНИЕ ТОГГЛОВ
+-- =============================================
 local function updateAllToggles()
     if getgenv().AutoChest then
         toggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
@@ -1237,6 +1387,9 @@ end
 
 updateAllToggles()
 
+-- =============================================
+-- ОБРАБОТЧИКИ
+-- =============================================
 toggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AutoChest = not getgenv().AutoChest
@@ -1306,12 +1459,15 @@ resetBtn.MouseButton1Click:Connect(function()
         sliderDot.Position = UDim2.new(0.52, -7, 0, -4)
         antiAFKSelectedTime = 0
         createTimeOptions()
-        pcall(function() delfile("VanezyHub_Settings.json") end)
+        pcall(function() delfile("VHub_Settings.json") end)
         createNotification("Settings", "✅ All settings have been reset", 3)
     end)
     noBtn.MouseButton1Click:Connect(function() closeNotif() end)
 end)
 
+-- =============================================
+-- ПОЛЁТ
+-- =============================================
 local flyCoroutine = nil
 
 local function stopFlying()
@@ -1446,6 +1602,9 @@ local function flyToChest()
     end)
 end
 
+-- =============================================
+-- СТАТУС-БАР
+-- =============================================
 local isMinimized = false
 
 function updateStatusBar()
@@ -1474,6 +1633,9 @@ function updateStatusBar()
     end
 end
 
+-- =============================================
+-- СВОРАЧИВАНИЕ
+-- =============================================
 CollapseBtn.MouseButton1Click:Connect(function()
     sidebarCollapsed = not sidebarCollapsed
     if sidebarCollapsed then
@@ -1541,8 +1703,10 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- =============================================
+-- ЗАКРЫТИЕ
+-- =============================================
 local function showGoodbyeAndClose()
-    -- Останавливаем все функции
     getgenv().AutoChest = false
     stopFlying()
     stopAntiAFK()
@@ -1566,12 +1730,10 @@ local function showGoodbyeAndClose()
         goodbyeText.TextTransparency = 1
         goodbyeText.Parent = MainFrame
         
-        -- Появление текста 1.5 сек
         TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             TextTransparency = 0
         }):Play()
         
-        -- Пауза 1 сек, затем исчезновение 1.5 сек
         task.delay(2.5, function()
             TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 TextTransparency = 1
@@ -1584,7 +1746,6 @@ local function showGoodbyeAndClose()
             }):Play()
         end)
         
-        -- Удаление через 4 секунды
         task.delay(4, function()
             MainGui:Destroy()
             NotifGui:Destroy()
@@ -1598,6 +1759,9 @@ end
 
 CloseBtn.MouseButton1Click:Connect(showGoodbyeAndClose)
 
+-- =============================================
+-- АКТИВАЦИЯ
+-- =============================================
 currentTab = "Home"
 if TabContents["Home"] then
     TabContents["Home"].Visible = true
@@ -1666,8 +1830,5 @@ task.spawn(function()
     end
 end)
 
-task.wait(0.5)
-createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
-
-print("Vanezy Hub v1 loaded!")
+print("≤V≥ Hub v1 loaded!")
 print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
