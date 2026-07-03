@@ -1,6 +1,6 @@
 --[[
     VANEZY HUB v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕНИЯМИ
+    ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕННЫМИ НАСТРОЙКАМИ
     Координаты сундука: (-55.20, -360.41, 9488.14)
 --]]
 
@@ -449,7 +449,6 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
--- Функция создания вопросика с подсказкой
 local function createHelpButton(parent, text)
     local helpBtn = Instance.new("TextButton")
     helpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -516,15 +515,23 @@ local TabIconsOnly = {}
 local currentTab = nil
 
 local function hideAllTabs()
-    if SettingsContent then SettingsContent.Visible = false end
-    -- Закрываем настройки
+    -- Закрываем панель настроек в боковой панели
     if settingsOpen then
         settingsOpen = false
         SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
     end
+    
+    -- Скрываем контент настроек
+    if SettingsContent then
+        SettingsContent.Visible = false
+    end
+    
+    -- Скрываем все вкладки
     for _, cnt in pairs(TabContents) do
         if cnt then cnt.Visible = false end
     end
+    
+    -- Сбрасываем стиль кнопок вкладок
     for _, btn in pairs(TabButtons) do
         if btn then
             btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
@@ -686,9 +693,33 @@ SettingsContent.ChildAdded:Connect(function()
 end)
 
 SettingsExpandedBtn.MouseButton1Click:Connect(function()
-    hideAllTabs()
+    -- Закрываем панель настроек в боковой панели
+    if settingsOpen then
+        settingsOpen = false
+        SettingsExpanded:TweenSize(UDim2.new(0, 0, 0, 32), "Out", "Quad", 0.25, true)
+    end
+    
+    -- Скрываем все содержимое
+    for _, cnt in pairs(TabContents) do
+        if cnt then cnt.Visible = false end
+    end
+    for _, btn in pairs(TabButtons) do
+        if btn then
+            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+    end
+    for _, btn in pairs(TabIconsOnly) do
+        if btn then
+            btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+    end
+    
+    -- Показываем контент настроек
     SettingsContent.Visible = true
     currentTab = "Settings"
+    
     local totalH = 0
     for _, child in pairs(SettingsContent:GetChildren()) do
         if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
@@ -760,7 +791,6 @@ end
 
 local homeContent = TabContents["Home"]
 
--- Вопросик для Home
 local homeHelpFrame = Instance.new("Frame")
 homeHelpFrame.Size = UDim2.new(1, -16, 0, 24)
 homeHelpFrame.BackgroundTransparency = 1
@@ -806,7 +836,6 @@ statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextSize = 11
 statusLabel.Parent = statusFrame
 
--- Auto chest с вопросиком
 local toggleFrame = Instance.new("Frame")
 toggleFrame.Size = UDim2.new(1, -16, 0, 42)
 toggleFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -843,7 +872,6 @@ toggleDot.BorderSizePixel = 0
 toggleDot.Parent = toggleBg
 Instance.new("UICorner", toggleDot).CornerRadius = UDim.new(1, 0)
 
--- Speed с вопросиком
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, -16, 0, 46)
 speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -919,7 +947,6 @@ end)
 
 createSectionHeader(SettingsContent, "Settings")
 
--- Anti AFK с вопросиком
 local antiAFKFrame = Instance.new("Frame")
 antiAFKFrame.Size = UDim2.new(1, -16, 0, 42)
 antiAFKFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -1102,7 +1129,6 @@ antiAFKArrow.MouseButton1Click:Connect(function()
     end
 end)
 
--- Save Settings с вопросиком
 local saveFrame = Instance.new("Frame")
 saveFrame.Size = UDim2.new(1, -16, 0, 42)
 saveFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -1138,7 +1164,6 @@ saveToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 saveToggleDot.Parent = saveToggleBg
 Instance.new("UICorner", saveToggleDot).CornerRadius = UDim.new(1, 0)
 
--- Reset с вопросиком
 local resetFrame = Instance.new("Frame")
 resetFrame.Size = UDim2.new(1, -16, 0, 36)
 resetFrame.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
@@ -1350,7 +1375,8 @@ local function flyToChest()
         StatusText.Text = "🔽 Descending..."
         task.wait(0.2)
         local phase2Done = false
-        while getgenv().FlyingActive and not phase2Done do            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
+        while getgenv().FlyingActive and not phase2Done do
+            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
             local currentPos = hrp.Position
             local direction = chestPosition - currentPos
             local distance = direction.Magnitude
