@@ -154,7 +154,7 @@ function createNotification(title, message, duration, customButtons)
     
     local nf = Instance.new("Frame")
     nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
-    nf.Position = UDim2.new(0.5, -135, 0, -80)
+    nf.Position = UDim2.new(0.5, -135, 0, -100)
     nf.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     nf.BorderSizePixel = 0
     nf.ClipsDescendants = true
