@@ -298,7 +298,7 @@ ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
 ToggleBtn.Position = UDim2.new(0, 12, 0.5, -20)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 ToggleBtn.BorderSizePixel = 0
-ToggleBtn.Text = "V"
+ToggleBtn.Text = "〔V〕"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.GothamBlack
 ToggleBtn.TextSize = 17
@@ -374,7 +374,7 @@ local HubTitle = Instance.new("TextLabel")
 HubTitle.Size = UDim2.new(1, -95, 0, 22)
 HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
-HubTitle.Text = "𓊈V𓊉 Hub v1"
+HubTitle.Text = "〔V〕Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
@@ -1519,6 +1519,7 @@ CollapseBtn.MouseButton1Click:Connect(function()
         CollapseBtn.Text = "▶"
         for _, btn in pairs(TabButtons) do btn.Visible = false end
         for _, btn in pairs(TabIconsOnly) do btn.Visible = true end
+        TabIconsOnly["Settings"].Visible = false
     else
         SidePanel:TweenSize(UDim2.new(0, SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
         ContentPanel:TweenSize(UDim2.new(1, -SIDEBAR_WIDTH, 1, -48), "Out", "Quad", 0.25, true)
@@ -1527,13 +1528,14 @@ CollapseBtn.MouseButton1Click:Connect(function()
         CollapseBtn.Text = "◀"
         for _, btn in pairs(TabButtons) do btn.Visible = true end
         for _, btn in pairs(TabIconsOnly) do btn.Visible = false end
+        TabButtons["Settings"].Visible = false
     end
 end)
 
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        MainFrame:TweenSize(UDim2.new(0, GUI_WIDTH, 0, 48), "Out", "Quad", 0.25, true)
+        MainFrame:TweenSize(UDim2.new(0, GUI_WIDTH, 0, 48), "Out", "Quad", 0.25, true) 
         SidePanel.Visible = false
         ContentPanel.Visible = false
         CollapseBtn.Visible = false
