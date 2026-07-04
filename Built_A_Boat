@@ -47,7 +47,7 @@ local WelcomeText = Instance.new("TextLabel")
 WelcomeText.Size = UDim2.new(0, 400, 0, 60)
 WelcomeText.Position = UDim2.new(0.5, -200, 0.5, -30)
 WelcomeText.BackgroundTransparency = 1
-WelcomeText.Text = "Welcome ≤V≥ hub"
+WelcomeText.Text = "Welcome〔V〕hub"
 WelcomeText.TextColor3 = Color3.fromRGB(255, 80, 80)
 WelcomeText.Font = Enum.Font.GothamBlack
 WelcomeText.TextSize = 28
@@ -163,6 +163,24 @@ function createNotification(title, message, duration, customButtons)
     Instance.new("UIStroke", nf).Color = Color3.fromRGB(40, 40, 40)
     Instance.new("UIStroke", nf).Thickness = 1
     
+            -- Градиент с переливанием
+    local gradient = Instance.new("UIGradient", nf)
+    local hue = 0
+    task.spawn(function()
+         while nf and nf.Parent do
+            hue = (hue + 0.005) % 1
+            pcall(function()
+                gradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0.3, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0.6, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, 0.8, 1)),
+                })
+            end)
+            task.wait(0.05)
+        end
+    end)
+    
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, customButtons and -12 or -35, 0, 20)
     titleLabel.Position = UDim2.new(0, 12, 0, 8)
@@ -209,6 +227,7 @@ function createNotification(title, message, duration, customButtons)
     timeLine.BorderSizePixel = 0
     timeLine.Parent = nf
     timeLine.ZIndex = 10
+    Instance.new("UICorner", timeLine).CornerRadius = UDim.new(0, 12)
     
     local yPos = 5 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
