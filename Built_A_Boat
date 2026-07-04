@@ -33,6 +33,44 @@ if CoreGui:FindFirstChild("VanezyHub") then CoreGui:FindFirstChild("VanezyHub"):
 if CoreGui:FindFirstChild("VanezyNotif") then CoreGui:FindFirstChild("VanezyNotif"):Destroy() end
 if CoreGui:FindFirstChild("VanezyToggle") then CoreGui:FindFirstChild("VanezyToggle"):Destroy() end
 
+-- =============================================
+-- ПРИВЕТСТВЕННЫЙ ЭКРАН (только текст, без фона)
+-- =============================================
+local WelcomeGui = Instance.new("ScreenGui")
+WelcomeGui.Name = "WelcomeScreen"
+WelcomeGui.ResetOnSpawn = false
+WelcomeGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+WelcomeGui.DisplayOrder = 1000
+WelcomeGui.Parent = CoreGui
+
+local WelcomeText = Instance.new("TextLabel")
+WelcomeText.Size = UDim2.new(0, 400, 0, 60)
+WelcomeText.Position = UDim2.new(0.5, -200, 0.5, -30)
+WelcomeText.BackgroundTransparency = 1
+WelcomeText.Text = "Welcome ≤V≥ hub"
+WelcomeText.TextColor3 = Color3.fromRGB(255, 80, 80)
+WelcomeText.Font = Enum.Font.GothamBlack
+WelcomeText.TextSize = 28
+WelcomeText.TextTransparency = 1
+WelcomeText.Parent = WelcomeGui
+
+task.spawn(function()
+    -- Появление текста 2.5 сек
+    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        TextTransparency = 0
+    }):Play()
+    task.wait(2.5)
+    -- Исчезновение текста 2.5 сек
+    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        TextTransparency = 1
+    }):Play()
+    task.wait(2.5)
+    WelcomeGui:Destroy()
+end)
+
+-- Задержка перед загрузкой основного GUI
+task.wait(2.5)
+
 local function saveSettings()
     if not getgenv().SaveSettings then return end
     local settings = {
@@ -147,6 +185,8 @@ function createNotification(title, message, duration, customButtons)
     msgLabel.TextXAlignment = Enum.TextXAlignment.Left
     msgLabel.RichText = true
     msgLabel.Parent = nf
+    titleLabel.ZIndex = 10
+    msgLabel.ZIndex = 10    
     
     local closeBtn
     if not customButtons then
@@ -159,6 +199,7 @@ function createNotification(title, message, duration, customButtons)
         closeBtn.Font = Enum.Font.GothamBold
         closeBtn.TextSize = 13
         closeBtn.Parent = nf
+        closeBtn.ZIndex = 10
     end
     
     local timeLine = Instance.new("Frame")
@@ -167,6 +208,7 @@ function createNotification(title, message, duration, customButtons)
     timeLine.BackgroundColor3 = Color3.fromRGB(255, 90, 90)
     timeLine.BorderSizePixel = 0
     timeLine.Parent = nf
+    timeLine.ZIndex = 10
     
     local yPos = 5 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -201,6 +243,7 @@ function createNotification(title, message, duration, customButtons)
         btnFrame.Position = UDim2.new(0, 0, 0, 52)
         btnFrame.BackgroundTransparency = 1
         btnFrame.Parent = nf
+        btnFrame.ZIndex = 10
         
         local yesBtn = Instance.new("TextButton")
         yesBtn.Size = UDim2.new(0, 80, 0, 26)
@@ -331,7 +374,7 @@ local HubTitle = Instance.new("TextLabel")
 HubTitle.Size = UDim2.new(1, -95, 0, 22)
 HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
-HubTitle.Text = "Vanezy Hub v1"
+HubTitle.Text = "𓊈V𓊉 Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
@@ -713,36 +756,28 @@ for i, tab in ipairs(Tabs) do
     tabBtn.MouseButton1Click:Connect(switchToTab)
     iconBtn.MouseButton1Click:Connect(switchToTab)
 end
+TabButtons["Settings"].Visible = false
+TabIconsOnly["Settings"].Visible = false
 
 -- Обработчик шестерёнки в заголовке
 HeaderSettingsBtn.MouseButton1Click:Connect(function()
-    if TabContents["Settings"] and TabButtons["Settings"] then
-        local switchFunc = TabButtons["Settings"].MouseButton1Click
-        -- Вызываем переключение на Settings
-        if currentTab ~= "Settings" then
-            currentTab = "Settings"
-            hideAllTabs()
-            local content = TabContents["Settings"]
-            content.BackgroundTransparency = 1
-            content.Visible = true
-            TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundTransparency = 0
-            }):Play()
-            TabButtons["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            TabButtons["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
-            if TabIconsOnly["Settings"] then
-                TabIconsOnly["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-                TabIconsOnly["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
-            end
-            local totalH = 0
-            for _, child in pairs(content:GetChildren()) do
-                if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
-                    totalH = totalH + child.AbsoluteSize.Y + 5
-                end
-            end
-            content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
+    if currentTab == "Settings" then return end
+    currentTab = "Settings"
+    hideAllTabs()
+    local content = TabContents["Settings"]
+    content.Visible = true
+    TabButtons["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    TabButtons["Settings"].TextColor3 = Color3.fromRGB(255, 255, 255)
+    if TabIconsOnly["Settings"] then
+        TabIconsOnly["Settings"].BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    end
+    local totalH = 0
+    for _, child in pairs(content:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+            totalH = totalH + child.AbsoluteSize.Y + 5
         end
     end
+    content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
 end)
 
 local SettingsContent = TabContents["Settings"]
@@ -1670,4 +1705,4 @@ task.wait(0.5)
 createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
 
 print("Vanezy Hub v1 loaded!")
-print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
+print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")<section></section>
