@@ -658,6 +658,8 @@ local TabIconsOnly = {}
 local currentTab = nil
 
 local function hideAllTabs()
+    HeaderSettingsBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    HeaderSettingsBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
     for _, cnt in pairs(TabContents) do
         if cnt then cnt.Visible = false end
     end
@@ -789,6 +791,8 @@ TabIconsOnly["Settings"].Visible = false
 HeaderSettingsBtn.MouseButton1Click:Connect(function()
     if currentTab == "Settings" then return end
     currentTab = "Settings"
+    HeaderSettingsBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    HeaderSettingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     hideAllTabs()
     local content = TabContents["Settings"]
     content.Visible = true
