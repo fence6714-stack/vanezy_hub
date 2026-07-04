@@ -171,13 +171,13 @@ function createNotification(title, message, duration, customButtons)
             hue = (hue + 0.005) % 1
             pcall(function()
                 gradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.3, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.6, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.5, 1)),
+                    ColorSequenceKeypoint.new(0.3, Color3.fromHSV((hue + 0.3) % 1, 0.5, 1)),
+                    ColorSequenceKeypoint.new(0.6, Color3.fromHSV((hue + 0.6) % 1, 0.5, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, 0.5, 1)),
                 })
             end)
-            task.wait(0.05)
+            task.wait(0.03)
         end
     end)
     
@@ -227,9 +227,8 @@ function createNotification(title, message, duration, customButtons)
     timeLine.BorderSizePixel = 0
     timeLine.Parent = nf
     timeLine.ZIndex = 10
-    Instance.new("UICorner", timeLine).CornerRadius = UDim.new(0, 12)
     
-    local yPos = 5 + (#activeNotifications * (customButtons and 100 or 72))
+    local yPos = -15 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -135, 0, yPos)
     }):Play()
@@ -503,7 +502,7 @@ SidePanel.Parent = MainFrame
 local ContentPanel = Instance.new("Frame")
 ContentPanel.Size = UDim2.new(1, -SIDEBAR_WIDTH, 1, -48)
 ContentPanel.Position = UDim2.new(0, SIDEBAR_WIDTH, 0, 48)
-ContentPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+ContentPanel.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
 ContentPanel.BorderSizePixel = 0
 ContentPanel.ClipsDescendants = true
 ContentPanel.Parent = MainFrame
@@ -584,12 +583,12 @@ local function createHelpButton(parent, text)
             hue = (hue + 0.005) % 1
             pcall(function()
                 gradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.5, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.5, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.5, 1)),
                 })
             end)
-            task.wait(0.05)
+            task.wait(0.03)
         end
     end)
     
@@ -733,44 +732,52 @@ for i, tab in ipairs(Tabs) do
     TabIconsOnly[tab.Name] = iconBtn
 
     local function switchToTab()
-        if currentTab == tab.Name then return end
-        currentTab = tab.Name
-        
-        -- Анимация переключения: скрываем старый, показываем новый с задержкой
-        local oldContent = nil
-        for _, cnt in pairs(TabContents) do
-            if cnt.Visible then oldContent = cnt break end
-        end
-        
-        if oldContent then
-            -- Плавно скрываем старый
-            TweenService:Create(oldContent, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1
-            }):Play()
-        end
-        
-        hideAllTabs()
-        
-        -- Плавно показываем новый
-        content.BackgroundTransparency = 1
-        content.Visible = true
-        TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0
-        }):Play()
-        
-        tabBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        iconBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        iconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        
-        local totalH = 0
-        for _, child in pairs(content:GetChildren()) do
-            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
-                totalH = totalH + child.AbsoluteSize.Y + 5
+    if currentTab == tab.Name then return end
+    currentTab = tab.Name
+    
+    local oldContent = nil
+    for _, cnt in pairs(TabContents) do
+        if cnt.Visible then oldContent = cnt break end
+    end
+    
+    -- Плавно скрываем старый текст
+    if oldContent then
+        for _, child in pairs(oldContent:GetChildren()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                TweenService:Create(child, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    TextTransparency = 1
+                }):Play()
             end
         end
-        content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
+        task.delay(0.3, function() oldContent.Visible = false end)
     end
+    
+    hideAllTabs()
+    content.Visible = true
+    
+    -- Плавно показываем новый текст
+    for _, child in pairs(content:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            child.TextTransparency = 1
+            TweenService:Create(child, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                TextTransparency = 0
+            }):Play()
+        end
+    end
+    
+    tabBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    iconBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    iconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local totalH = 0
+    for _, child in pairs(content:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextLabel") then
+            totalH = totalH + child.AbsoluteSize.Y + 5
+        end
+    end
+    content.CanvasSize = UDim2.new(0, 0, 0, totalH + 10)
+end
 
     tabBtn.MouseButton1Click:Connect(switchToTab)
     iconBtn.MouseButton1Click:Connect(switchToTab)
