@@ -1705,4 +1705,4 @@ task.wait(0.5)
 createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
 
 print("Vanezy Hub v1 loaded!")
-print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")<section></section>
+print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
