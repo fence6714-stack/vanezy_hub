@@ -1,7 +1,6 @@
 --[[
-    ≤V≥ Hub v1 - Auto Chest Farm
-    ПОЛНЫЙ СКРИПТ БЕЗ ОБРЕЗАНИЙ
-    Координаты сундука: (-55.20, -360.41, 9488.14)
+    VANEZY HUB v1 - Auto Chest Farm
+    ПОЛНЫЙ СКРИПТ С ФИНАЛЬНЫМИ ИСПРАВЛЕНИЯМИ
 --]]
 
 local Players = game:GetService("Players")
@@ -33,57 +32,6 @@ end
 if CoreGui:FindFirstChild("VanezyHub") then CoreGui:FindFirstChild("VanezyHub"):Destroy() end
 if CoreGui:FindFirstChild("VanezyNotif") then CoreGui:FindFirstChild("VanezyNotif"):Destroy() end
 if CoreGui:FindFirstChild("VanezyToggle") then CoreGui:FindFirstChild("VanezyToggle"):Destroy() end
-if CoreGui:FindFirstChild("WelcomeScreen") then CoreGui:FindFirstChild("WelcomeScreen"):Destroy() end
-
--- =============================================
--- ПРИВЕТСТВЕННЫЙ ЭКРАН
--- =============================================
-local WelcomeGui = Instance.new("ScreenGui")
-WelcomeGui.Name = "WelcomeScreen"
-WelcomeGui.ResetOnSpawn = false
-WelcomeGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-WelcomeGui.DisplayOrder = 1000
-WelcomeGui.Parent = CoreGui
-
-local WelcomeFrame = Instance.new("Frame")
-WelcomeFrame.Size = UDim2.new(1, 0, 1, 0)
-WelcomeFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-WelcomeFrame.BackgroundTransparency = 1
-WelcomeFrame.BorderSizePixel = 0
-WelcomeFrame.Parent = WelcomeGui
-
-local WelcomeText = Instance.new("TextLabel")
-WelcomeText.Size = UDim2.new(0, 400, 0, 60)
-WelcomeText.Position = UDim2.new(0.5, -200, 0.5, -30)
-WelcomeText.BackgroundTransparency = 1
-WelcomeText.Text = "Welcome ≤V≥ hub"
-WelcomeText.TextColor3 = Color3.fromRGB(255, 80, 80)
-WelcomeText.Font = Enum.Font.GothamBlack
-WelcomeText.TextSize = 28
-WelcomeText.TextTransparency = 1
-WelcomeText.Parent = WelcomeFrame
-
--- Анимация приветствия: появление 2.5с, пауза, исчезновение 2.5с
-task.spawn(function()
-    TweenService:Create(WelcomeFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        BackgroundTransparency = 0
-    }):Play()
-    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        TextTransparency = 0
-    }):Play()
-    task.wait(2.5)
-    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        TextTransparency = 1
-    }):Play()
-    TweenService:Create(WelcomeFrame, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        BackgroundTransparency = 1
-    }):Play()
-    task.wait(2.5)
-    WelcomeGui:Destroy()
-end)
-
--- Задержка перед загрузкой основного GUI
-task.wait(2.5)
 
 local function saveSettings()
     if not getgenv().SaveSettings then return end
@@ -137,9 +85,6 @@ local function stopAntiAFK()
     end
 end
 
--- =============================================
--- УВЕДОМЛЕНИЯ С ГРАДИЕНТОМ
--- =============================================
 local NotifGui = Instance.new("ScreenGui")
 NotifGui.Name = "VanezyNotif"
 NotifGui.ResetOnSpawn = false
@@ -172,51 +117,13 @@ function createNotification(title, message, duration, customButtons)
     local nf = Instance.new("Frame")
     nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
     nf.Position = UDim2.new(0.5, -135, 0, -80)
-    nf.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    nf.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     nf.BorderSizePixel = 0
     nf.ClipsDescendants = true
     nf.Parent = NotifGui
     Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", nf).Color = Color3.fromRGB(40, 40, 40)
     Instance.new("UIStroke", nf).Thickness = 1
-    
-    -- Градиент с анимацией появления 2 секунды
-    local gradient = Instance.new("UIGradient", nf)
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 140, 40)),
-        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255, 60, 100)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60)),
-    })
-    gradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(1, 0),
-    })
-    
-    -- Анимация появления градиента 2 секунды
-    TweenService:Create(gradient, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(1, 0),
-        })
-    }):Play()
-    
-    -- Анимация переливания градиента
-    local hue = 0
-    task.spawn(function()
-        while nf and nf.Parent do
-            hue = (hue + 0.005) % 1
-            pcall(function()
-                gradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.3, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.6, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, 0.8, 1)),
-                })
-            end)
-            task.wait(0.05)
-        end
-    end)
     
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, customButtons and -12 or -35, 0, 20)
@@ -234,7 +141,7 @@ function createNotification(title, message, duration, customButtons)
     msgLabel.Position = UDim2.new(0, 12, 0, 28)
     msgLabel.BackgroundTransparency = 1
     msgLabel.Text = message
-    msgLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    msgLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
     msgLabel.Font = Enum.Font.Gotham
     msgLabel.TextSize = 9
     msgLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -337,9 +244,6 @@ function copyToClipboard(text, label)
     end
 end
 
--- =============================================
--- КРУГЛАЯ КНОПКА
--- =============================================
 local ToggleBtnGui = Instance.new("ScreenGui")
 ToggleBtnGui.Name = "VanezyToggle"
 ToggleBtnGui.ResetOnSpawn = false
@@ -351,7 +255,7 @@ ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
 ToggleBtn.Position = UDim2.new(0, 12, 0.5, -20)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 ToggleBtn.BorderSizePixel = 0
-ToggleBtn.Text = "≤V≥"
+ToggleBtn.Text = "V"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.GothamBlack
 ToggleBtn.TextSize = 17
@@ -375,9 +279,6 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- =============================================
--- ГЛАВНЫЙ GUI
--- =============================================
 local MainGui = Instance.new("ScreenGui")
 MainGui.Name = "VanezyHub"
 MainGui.ResetOnSpawn = false
@@ -406,9 +307,6 @@ TweenService:Create(MainFrame, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.Easi
     Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT/2)
 }):Play()
 
--- =============================================
--- ЗАГОЛОВОК
--- =============================================
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 48)
 Header.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -433,7 +331,7 @@ local HubTitle = Instance.new("TextLabel")
 HubTitle.Size = UDim2.new(1, -95, 0, 22)
 HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
-HubTitle.Text = "≤V≥ Hub v1"
+HubTitle.Text = "Vanezy Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
@@ -529,9 +427,6 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- =============================================
--- БОКОВАЯ ПАНЕЛЬ (БЕЗ НАСТРОЕК)
--- =============================================
 local SIDEBAR_WIDTH = 145
 local SIDEBAR_COLLAPSED_WIDTH = 45
 
@@ -566,7 +461,7 @@ Instance.new("UICorner", CollapseBtn).CornerRadius = UDim.new(0, 4)
 
 local sidebarCollapsed = false
 
--- Список всех открытых тултипов
+-- Список всех открытых тултипов для закрытия при клике в любом месте
 local allTooltips = {}
 
 local function closeAllTooltips()
@@ -596,7 +491,6 @@ UIS.InputBegan:Connect(function(input)
     end
 end)
 
--- Функция создания вопросика с градиентом
 local function createHelpButton(parent, text)
     local helpBtn = Instance.new("TextButton")
     helpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -620,20 +514,7 @@ local function createHelpButton(parent, text)
     tooltip.ZIndex = 100
     tooltip.Parent = MainGui
     
-    -- Градиент с анимацией появления 2 секунды
     local gradient = Instance.new("UIGradient", tooltip)
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 140, 40)),
-        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255, 60, 100)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60)),
-    })
-    gradient.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(1, 0),
-    })
-    
-    -- Анимация переливания
     local hue = 0
     task.spawn(function()
         while true do
@@ -642,9 +523,8 @@ local function createHelpButton(parent, text)
             pcall(function()
                 gradient.Color = ColorSequence.new({
                     ColorSequenceKeypoint.new(0, Color3.fromHSV(hue, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.3, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(0.6, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV(hue, 0.8, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.3) % 1, 0.8, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.6) % 1, 0.8, 1)),
                 })
             end)
             task.wait(0.05)
@@ -680,24 +560,15 @@ local function createHelpButton(parent, text)
     end
     
     helpBtn.MouseButton1Click:Connect(function()
+        -- Закрываем все другие тултипы
         closeAllTooltips()
+        
         tooltipData.tooltipOpen = not tooltipData.tooltipOpen
         if tooltipData.tooltipOpen then
             updatePosition()
             tooltip.Visible = true
             helpBtn.BackgroundColor3 = Color3.fromRGB(255, 120, 80)
             tooltip.Size = UDim2.new(0, 0, 0, 50)
-            -- Анимация появления градиента 2 секунды
-            gradient.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(1, 0),
-            })
-            TweenService:Create(gradient, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Transparency = NumberSequence.new({
-                    NumberSequenceKeypoint.new(0, 0),
-                    NumberSequenceKeypoint.new(1, 0),
-                })
-            }):Play()
             TweenService:Create(tooltip, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 200, 0, 50)
             }):Play()
@@ -714,9 +585,6 @@ local function createHelpButton(parent, text)
     return helpBtn
 end
 
--- =============================================
--- ВКЛАДКИ (HOME, MAIN, SETTINGS)
--- =============================================
 local Tabs = {
     {Name = "Home", Icon = "🏠"},
     {Name = "Main", Icon = "🎯"},
@@ -806,12 +674,14 @@ for i, tab in ipairs(Tabs) do
         if currentTab == tab.Name then return end
         currentTab = tab.Name
         
+        -- Анимация переключения: скрываем старый, показываем новый с задержкой
         local oldContent = nil
         for _, cnt in pairs(TabContents) do
             if cnt.Visible then oldContent = cnt break end
         end
         
         if oldContent then
+            -- Плавно скрываем старый
             TweenService:Create(oldContent, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1
             }):Play()
@@ -819,6 +689,7 @@ for i, tab in ipairs(Tabs) do
         
         hideAllTabs()
         
+        -- Плавно показываем новый
         content.BackgroundTransparency = 1
         content.Visible = true
         TweenService:Create(content, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -846,6 +717,8 @@ end
 -- Обработчик шестерёнки в заголовке
 HeaderSettingsBtn.MouseButton1Click:Connect(function()
     if TabContents["Settings"] and TabButtons["Settings"] then
+        local switchFunc = TabButtons["Settings"].MouseButton1Click
+        -- Вызываем переключение на Settings
         if currentTab ~= "Settings" then
             currentTab = "Settings"
             hideAllTabs()
@@ -874,9 +747,6 @@ end)
 
 local SettingsContent = TabContents["Settings"]
 
--- =============================================
--- ЗАГОЛОВКИ И РАЗДЕЛИТЕЛИ
--- =============================================
 local function createSectionHeader(parent, text)
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, -16, 0, 22)
@@ -944,9 +814,6 @@ local function createDivider(parent)
     })
 end
 
--- =============================================
--- HOME
--- =============================================
 local homeContent = TabContents["Home"]
 
 local homeHelpFrame = Instance.new("Frame")
@@ -974,9 +841,6 @@ bugLabel.TextWrapped = true
 bugLabel.Parent = homeContent
 Instance.new("UICorner", bugLabel).CornerRadius = UDim.new(0, 6)
 
--- =============================================
--- MAIN
--- =============================================
 createSectionHeader(TabContents["Main"], "Main")
 
 local mainContent = TabContents["Main"]
@@ -1106,9 +970,6 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- =============================================
--- SETTINGS
--- =============================================
 createSectionHeader(SettingsContent, "Settings")
 
 local antiAFKFrame = Instance.new("Frame")
@@ -1344,9 +1205,6 @@ resetBtn.Font = Enum.Font.GothamBold
 resetBtn.TextSize = 12
 resetBtn.Parent = resetFrame
 
--- =============================================
--- ОБНОВЛЕНИЕ ТОГГЛОВ
--- =============================================
 local function updateAllToggles()
     if getgenv().AutoChest then
         toggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
@@ -1379,9 +1237,6 @@ end
 
 updateAllToggles()
 
--- =============================================
--- ОБРАБОТЧИКИ
--- =============================================
 toggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AutoChest = not getgenv().AutoChest
@@ -1457,9 +1312,6 @@ resetBtn.MouseButton1Click:Connect(function()
     noBtn.MouseButton1Click:Connect(function() closeNotif() end)
 end)
 
--- =============================================
--- ПОЛЁТ
--- =============================================
 local flyCoroutine = nil
 
 local function stopFlying()
@@ -1594,9 +1446,6 @@ local function flyToChest()
     end)
 end
 
--- =============================================
--- СТАТУС-БАР
--- =============================================
 local isMinimized = false
 
 function updateStatusBar()
@@ -1625,9 +1474,6 @@ function updateStatusBar()
     end
 end
 
--- =============================================
--- СВОРАЧИВАНИЕ РАЗДЕЛОВ
--- =============================================
 CollapseBtn.MouseButton1Click:Connect(function()
     sidebarCollapsed = not sidebarCollapsed
     if sidebarCollapsed then
@@ -1649,9 +1495,6 @@ CollapseBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- =============================================
--- СВОРАЧИВАНИЕ ОКНА
--- =============================================
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
@@ -1668,9 +1511,6 @@ MinBtn.MouseButton1Click:Connect(function()
     updateStatusBar()
 end)
 
--- =============================================
--- КРУГЛАЯ КНОПКА
--- =============================================
 local guiVisible = true
 ToggleBtn.MouseButton1Click:Connect(function()
     if guiVisible then
@@ -1701,10 +1541,8 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- =============================================
--- ЗАКРЫТИЕ
--- =============================================
 local function showGoodbyeAndClose()
+    -- Останавливаем все функции
     getgenv().AutoChest = false
     stopFlying()
     stopAntiAFK()
@@ -1728,10 +1566,12 @@ local function showGoodbyeAndClose()
         goodbyeText.TextTransparency = 1
         goodbyeText.Parent = MainFrame
         
+        -- Появление текста 1.5 сек
         TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             TextTransparency = 0
         }):Play()
         
+        -- Пауза 1 сек, затем исчезновение 1.5 сек
         task.delay(2.5, function()
             TweenService:Create(goodbyeText, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 TextTransparency = 1
@@ -1744,6 +1584,7 @@ local function showGoodbyeAndClose()
             }):Play()
         end)
         
+        -- Удаление через 4 секунды
         task.delay(4, function()
             MainGui:Destroy()
             NotifGui:Destroy()
@@ -1757,9 +1598,6 @@ end
 
 CloseBtn.MouseButton1Click:Connect(showGoodbyeAndClose)
 
--- =============================================
--- АКТИВАЦИЯ
--- =============================================
 currentTab = "Home"
 if TabContents["Home"] then
     TabContents["Home"].Visible = true
@@ -1831,5 +1669,5 @@ end)
 task.wait(0.5)
 createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
 
-print("≤V≥ Hub v1 loaded!")
+print("Vanezy Hub v1 loaded!")
 print("Speed: " .. getgenv().FlySpeedPercent .. "% (" .. getFlySpeed() .. ")")
