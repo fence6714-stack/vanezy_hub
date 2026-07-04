@@ -228,7 +228,7 @@ function createNotification(title, message, duration, customButtons)
     timeLine.Parent = nf
     timeLine.ZIndex = 10
     
-    local yPos = -15 + (#activeNotifications * (customButtons and 100 or 72))
+    local yPos = -50 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -135, 0, yPos)
     }):Play()
