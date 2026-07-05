@@ -7,7 +7,8 @@ local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
-local chestPosition = Vector3.new(-55.20, -360.41, 9488.14)
+local startPosition = Vector3.new(-166.40, 70.18, 1348.10)    -- начальная точка
+local chestPosition = Vector3.new(-55.20, -360.41, 9488.14)   -- сундук
 local flyHeight = 500
 local maxFlySpeed = 1000
 
@@ -1456,64 +1457,85 @@ local function flyToChest()
         bg.CFrame = hrp.CFrame
         bg.Parent = hrp
         hum.PlatformStand = true
-        local targetAbove = chestPosition + Vector3.new(0, flyHeight, 0)
-        statusLabel.Text = "🔼 Flying to chest..."
-        StatusText.Text = "🔼 Flying..."
         local currentSpeed = getFlySpeed()
-        local phase1Done = false
-        while getgenv().FlyingActive and not phase1Done do
-            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
-            local currentPos = hrp.Position
-            local direction = targetAbove - currentPos
-            local distance = direction.Magnitude
-            if distance < 3 then
-                bv.Velocity = Vector3.zero
-                hrp.CFrame = CFrame.new(targetAbove)
-                phase1Done = true
-                break
-            end
-            bv.Velocity = direction.Unit * math.min(currentSpeed, distance * 2)
-            bg.CFrame = CFrame.lookAt(currentPos, targetAbove)
-            task.wait()
-        end
-        if not getgenv().FlyingActive then return end
-        if hum and hum.Health <= 0 then
-            getgenv().FlyingActive = false
-            StatusText.Text = "💀 Dead, waiting..."
-            return
-        end
-        statusLabel.Text = "🔽 Descending..."
-        StatusText.Text = "🔽 Descending..."
-        task.wait(0.2)
-        local phase2Done = false
-        while getgenv().FlyingActive and not phase2Done do
-            if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
-            local currentPos = hrp.Position
-            local direction = chestPosition - currentPos
-            local distance = direction.Magnitude
-            if distance < 2 then
-                bv.Velocity = Vector3.zero
-                hrp.CFrame = CFrame.new(chestPosition)
-                phase2Done = true
-                break
-            end
-            local vel = direction.Unit * math.min(currentSpeed * 0.8, distance * 2)
-            if vel.Y > 0 then vel = Vector3.new(vel.X, -math.abs(vel.Y), vel.Z) end
-            bv.Velocity = vel
-            bg.CFrame = CFrame.lookAt(currentPos, chestPosition)
-            task.wait()
-        end
-        if bv then bv:Destroy() end
-        if bg then bg:Destroy() end
-        if hum and hum.PlatformStand then hum.PlatformStand = false end
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then part.LocalTransparencyModifier = 0 part.CanCollide = true end
-        end
-        getgenv().FlyingActive = false
-        if hum and hum.Health <= 0 then
-            StatusText.Text = "💀 Dead, waiting..."
-            return
-        end
+
+-- Этап 1: Летим к startPosition
+statusLabel.Text = "🔼 Flying to start..."
+StatusText.Text = "🔼 Flying to start..."
+local phase1Done = false
+while getgenv().FlyingActive and not phase1Done do
+    if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
+    local dir = startPosition - hrp.Position
+    local dist = dir.Magnitude
+    if dist < 3 then
+        bv.Velocity = Vector3.zero
+        hrp.CFrame = CFrame.new(startPosition)
+        phase1Done = true
+        break
+    end
+    bv.Velocity = dir.Unit * math.min(currentSpeed, dist * 2)
+    bg.CFrame = CFrame.lookAt(hrp.Position, startPosition)
+    task.wait()
+end
+if not getgenv().FlyingActive then return end
+if hum and hum.Health <= 0 then
+    getgenv().FlyingActive = false
+    StatusText.Text = "💀 Dead, waiting..."
+    return
+end
+-- Этап 2: Летим к точке над сундуком
+local targetAbove = chestPosition + Vector3.new(0, flyHeight, 0)
+statusLabel.Text = "🔼 Flying above chest..."
+StatusText.Text = "🔼 Flying above..."
+local phase2Done = false
+while getgenv().FlyingActive and not phase2Done do
+    if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
+    local dir = targetAbove - hrp.Position
+    local dist = dir.Magnitude
+    if dist < 3 then
+        bv.Velocity = Vector3.zero
+        hrp.CFrame = CFrame.new(targetAbove)
+        phase2Done = true
+        break
+    end
+    bv.Velocity = dir.Unit * math.min(currentSpeed, dist * 2)
+    bg.CFrame = CFrame.lookAt(hrp.Position, targetAbove)
+    task.wait()
+end
+if not getgenv().FlyingActive then return end
+if hum and hum.Health <= 0 then
+    getgenv().FlyingActive = false
+    StatusText.Text = "💀 Dead, waiting..."
+    return
+end
+
+-- Этап 3: Снижаемся к сундуку
+statusLabel.Text = "🔽 Descending..."
+StatusText.Text = "🔽 Descending..."
+task.wait(0.2)
+local phase3Done = false
+while getgenv().FlyingActive and not phase3Done do
+    if not hrp or not hrp.Parent or not hum or hum.Health <= 0 then break end
+    local dir = chestPosition - hrp.Position
+    local dist = dir.Magnitude
+    if dist < 2 then
+        bv.Velocity = Vector3.zero
+        hrp.CFrame = CFrame.new(chestPosition)
+        phase3Done = true
+        break
+    end
+    local vel = dir.Unit * math.min(currentSpeed * 0.8, dist * 2)
+    if vel.Y > 0 then vel = Vector3.new(vel.X, -math.abs(vel.Y), vel.Z) end
+    bv.Velocity = vel
+    bg.CFrame = CFrame.lookAt(hrp.Position, chestPosition)
+    task.wait()
+end
+if not getgenv().FlyingActive then return end
+if hum and hum.Health <= 0 then
+    getgenv().FlyingActive = false
+    StatusText.Text = "💀 Dead, waiting..."
+    return
+end
         statusLabel.Text = "🎯 At chest! Waiting..."
         StatusText.Text = "🎯 At chest!"
         while getgenv().AutoChest and not isAwayFromChest() do
