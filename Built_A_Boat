@@ -389,6 +389,7 @@ HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
 HubTitle.Text = "〔V〕Hub v1"
 HubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+HubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
 HubTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -397,9 +398,27 @@ HubTitle.Parent = Header
 local titleGradient = Instance.new("UIGradient", HubTitle)
 titleGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 80, 80)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 100, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 100, 255)),
 })
+
+-- Анимация движения границы
+local gradOffset = 0
+local gradDir = 1
+task.spawn(function()
+    while HubTitle and HubTitle.Parent do
+        gradOffset = gradOffset + 0.005 * gradDir
+        if gradOffset >= 0.5 then gradDir = -1
+        elseif gradOffset <= -0.5 then gradDir = 1 end
+        
+        titleGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+            ColorSequenceKeypoint.new(math.clamp(0.5 + gradOffset, 0, 1), Color3.fromRGB(50, 100, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 100, 255)),
+        })
+        task.wait(0.05)
+    end
+end)
 
 local HubSub = Instance.new("TextLabel")
 HubSub.Size = UDim2.new(1, -95, 0, 14)
