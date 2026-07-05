@@ -223,7 +223,7 @@ function createNotification(title, message, duration, customButtons)
     timeLine.Parent = nf
     timeLine.ZIndex = 10
     
-    local yPos = -50 + (#activeNotifications * (customButtons and 100 or 72))
+    local yPos = -15 + (#activeNotifications * (customButtons and 100 or 72))
     TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, -135, 0, yPos)
     }):Play()
@@ -388,11 +388,27 @@ HubTitle.Size = UDim2.new(1, -95, 0, 22)
 HubTitle.Position = UDim2.new(0, 45, 0, 5)
 HubTitle.BackgroundTransparency = 1
 HubTitle.Text = "〔V〕Hub v1"
-HubTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
+HubTitle.TextColor3 = Color3.fromRGB(50, 100, 255)
 HubTitle.Font = Enum.Font.GothamBlack
 HubTitle.TextSize = 17
 HubTitle.TextXAlignment = Enum.TextXAlignment.Left
 HubTitle.Parent = Header
+local titleT = 0
+local titleDirection = 1
+task.spawn(function()
+    while HubTitle and HubTitle.Parent do
+        titleT = titleT + 0.001 * titleDirection
+        if titleT >= 1 then titleDirection = -1
+        elseif titleT <= 0 then titleDirection = 1 end
+        
+        local r = 50 + 205 * titleT
+        local g = 100 - 80 * titleT
+        local b = 255 * (1 - titleT)
+        
+        HubTitle.TextColor3 = Color3.fromRGB(r, g, b)
+        task.wait(0.05)
+    end
+end)
 
 local HubSub = Instance.new("TextLabel")
 HubSub.Size = UDim2.new(1, -95, 0, 14)
