@@ -5,19 +5,30 @@ local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
+local Mouse = Player:GetMouse()
 
 getgenv().ESPPlayers = false
 getgenv().ESPTeammates = false
 getgenv().Aimbot = false
 getgenv().Tracers = false
-getgenv().AimSpeed = 0.3
-getgenv().FOVSize = 150
+getgenv().AimSpeed = 0.5
+getgenv().FOVSize = 100
 getgenv().AimPart = "Head"
-getgenv().MaxDistance = 1000
+getgenv().MaxDistance = 400
 getgenv().AntiAFK = false
 getgenv().AutoShoot = false
 getgenv().AutoShootDelay = 0.15
 getgenv().AutoShootFOV = 80
+getgenv().Fly = false
+getgenv().Noclip = false
+getgenv().SpeedBoost = false
+getgenv().InfiniteJump = false
+getgenv().ESPWallCheck = false
+getgenv().Triggerbot = false
+getgenv().FlySpeed = 60
+getgenv().SpeedMultiplier = 2.5
+getgenv().GodMode = false
+getgenv().FullBright = false
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
@@ -29,6 +40,43 @@ local espCache = {}
 local aimLockTarget = nil
 local lastShootTime = 0
 local isMinimized = false
+local defaultWalkSpeed = 16
+local flyBodyVelocity = nil
+local noclipParts = {}
+local triggerbotConn = nil
+
+local function getChar()
+    return Player.Character
+end
+
+local function getHRP()
+    local c = getChar()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum()
+    local c = getChar()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function hasLOS(origin, target)
+    local dir = target - origin
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    local ex = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character then table.insert(ex, p.Character) end
+    end
+    rp.FilterDescendantsInstances = ex
+    return workspace:Raycast(origin, dir.Unit * dir.Magnitude, rp) == nil
+end
+
+UIS.JumpRequest:Connect(function()
+    if getgenv().InfiniteJump then
+        local hum = getHum()
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
 
 local function initDraw(player)
     if espCache[player] then return end
@@ -56,6 +104,70 @@ end
 local function isTeammate(player)
     if not Player.Team or not player.Team then return false end
     return Player.Team == player.Team
+end
+
+local silentAimTarget = nil
+
+local function getSilentAimTarget()
+    local target, nearest = nil, getgenv().FOVSize
+    local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character then
+            local hum = p.Character:FindFirstChild("Humanoid")
+            local head = p.Character:FindFirstChild("Head")
+            if hum and head and hum.Health > 0 then
+                if isTeammate(p) then continue end
+                local screen, visible = Camera:WorldToViewportPoint(head.Position)
+                if visible then
+                    local dist = (Vector2.new(screen.X, screen.Y) - mid).Magnitude
+                    if dist < getgenv().FOVSize and dist < nearest then
+                        nearest = dist
+                        target = head
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+local function silentShoot()
+    if not getgenv().Aimbot then return end
+    
+    local target = getSilentAimTarget()
+    if not target then return end
+    
+    local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    
+    local targetPos = target.Position + Vector3.new(0, 0.5, 0)
+    
+    -- Отправляем выстрел в цель
+    for _, obj in ipairs(tool:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            pcall(function() obj:FireServer(targetPos, target, Vector3.new(0, 1, 0)) end)
+            pcall(function() obj:FireServer(targetPos, target) end)
+            pcall(function() obj:FireServer(targetPos) end)
+        end
+    end
+    
+    -- Общие названия RemoteEvent
+    for _, name in ipairs({"Fire", "Shoot", "RemoteEvent", "Hit", "Replicate"}) do
+        local r = tool:FindFirstChild(name)
+        if r and r:IsA("RemoteEvent") then
+            pcall(function() r:FireServer(targetPos, target) end)
+            pcall(function() r:FireServer(targetPos) end)
+        end
+    end
+    
+    -- Для Rivals через ReplicatedStorage
+    pcall(function()
+        local hitRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Hit")
+        if hitRemote then
+            hitRemote:FireServer(targetPos, target)
+        end
+    end)
 end
 
 local function findBestTarget()
@@ -93,6 +205,12 @@ local function findBestTarget()
                                 end
                                 if dist < 100 then
                                     score = score * 0.5
+                                end
+                                if getgenv().ESPWallCheck then
+                                    local myHRP = getHRP()
+                                    if myHRP and not hasLOS(myHRP.Position, hitPart.Position) then
+                                        continue
+                                    end
                                 end
                                 if score < nearest then
                                     nearest = score
@@ -183,52 +301,240 @@ local function cleanupESP()
     if fovCircle then fovCircle:Remove() end
 end
 
+-- ===== FLY =====
+local function enableFly()
+    if flyBodyVelocity then return end
+    local hrp = getHRP()
+    if not hrp then return end
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    flyBodyVelocity.Parent = hrp
+end
+
+local function disableFly()
+    if flyBodyVelocity then
+        flyBodyVelocity:Destroy()
+        flyBodyVelocity = nil
+    end
+end
+
+-- ===== NOCLIP =====
+local function enableNoclip()
+    local c = getChar()
+    if not c then return end
+    for _, p in pairs(c:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CanCollide = false
+            table.insert(noclipParts, p)
+        end
+    end
+end
+
+local function disableNoclip()
+    for _, p in pairs(noclipParts) do
+        pcall(function() p.CanCollide = true end)
+    end
+    noclipParts = {}
+end
+
+-- ===== TRIGGERBOT =====
+local function triggerFireTool(enemyChar, hitPart)
+    local char = getChar()
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+    local hitPos = hitPart and hitPart.Position or Mouse.Hit.Position
+    for _, obj in ipairs(tool:GetDescendants()) do
+        if not obj:IsA("RemoteEvent") then continue end
+        pcall(function() obj:FireServer(hitPos, hitPart) end)
+        pcall(function() obj:FireServer(hitPos) end)
+    end
+    for _, name in ipairs({"RE","Fire","Shoot","FireWeapon","ShootEvent","RemoteEvent"}) do
+        local r = tool:FindFirstChild(name)
+        if r and r:IsA("RemoteEvent") then
+            pcall(function() r:FireServer(hitPos, hitPart) end)
+            pcall(function() r:FireServer(hitPos) end)
+        end
+    end
+end
+
+local function getEnemyAtCrosshair()
+    local mPos = UIS:GetMouseLocation()
+    local myHRP = getHRP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p == Player then continue end
+        local char = p.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        if isTeammate(p) then continue end
+        local parts = {"Head", "HumanoidRootPart"}
+        for _, partName in ipairs(parts) do
+            local part = char:FindFirstChild(partName)
+            if not part then continue end
+            if myHRP and getgenv().ESPWallCheck and not hasLOS(myHRP.Position, part.Position) then continue end
+            local vPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if not onScreen or vPos.Z <= 0 then continue end
+            local d = (Vector2.new(vPos.X, vPos.Y) - mPos).Magnitude
+            if d < 50 then return part end
+        end
+    end
+    return nil
+end
+
+local function enableTriggerbot()
+    if triggerbotConn then return end
+    triggerbotConn = RunService.Heartbeat:Connect(function()
+        if not getgenv().Triggerbot then return end
+        local hitPart = getEnemyAtCrosshair()
+        if not hitPart then return end
+        triggerFireTool(hitPart.Parent, hitPart)
+    end)
+end
+
+local function disableTriggerbot()
+    if triggerbotConn then triggerbotConn:Disconnect(); triggerbotConn = nil end
+end
+
+local function enableGodMode()
+    local hum = getHum()
+    if hum then
+        hum.MaxHealth = 99999
+        hum.Health = 99999
+    end
+end
+
+local function disableGodMode()
+    local hum = getHum()
+    if hum then
+        hum.MaxHealth = 100
+        hum.Health = 100
+    end
+end
+
+local function enableFullBright()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.BrickColor = BrickColor.new("White")
+        end
+    end
+    game.Lighting.Brightness = 2
+    game.Lighting.ClockTime = 12
+    game.Lighting.FogEnd = 100000
+    game.Lighting.GlobalShadows = false
+    game.Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    game.Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+end
+
+local function disableFullBright()
+    game.Lighting.Brightness = 0.5
+    game.Lighting.ClockTime = 0
+    game.Lighting.FogEnd = 1000
+    game.Lighting.GlobalShadows = true
+    game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    game.Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+end
+
 local renderConnection
 renderConnection = RunService.RenderStepped:Connect(function()
+    cache.frameSkip = cache.frameSkip + 1
+    if cache.frameSkip % 2 == 0 then return end
+    
+    if not getgenv().ESPPlayers and not getgenv().Aimbot and not getgenv().Tracers and not getgenv().Fly and not getgenv().Noclip then
+        return
+    end
+    
+    updateCache()
     local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
     fovCircle.Position = mid
     fovCircle.Radius = getgenv().FOVSize
     fovCircle.Visible = getgenv().Aimbot
+    
     if getgenv().Aimbot then
         local target = findBestTarget()
         if target then
             Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, target.Position), getgenv().AimSpeed)
         end
     end
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Player then
-            local char = p.Character
-            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                local isTeam = isTeammate(p)
-                if not getgenv().ESPTeammates and isTeam then
-                    if espCache[p] then
-                        espCache[p].line.Visible = false
-                        espCache[p].box.Visible = false
+    
+    if getgenv().Fly and flyBodyVelocity then
+        local move = Vector3.new()
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + Vector3.new(0, 0, -getgenv().FlySpeed) end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move = move + Vector3.new(0, 0, getgenv().FlySpeed) end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move = move + Vector3.new(-getgenv().FlySpeed, 0, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + Vector3.new(getgenv().FlySpeed, 0, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, getgenv().FlySpeed, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then move = move + Vector3.new(0, -getgenv().FlySpeed, 0) end
+        flyBodyVelocity.Velocity = Camera.CFrame:VectorToWorldSpace(move)
+    end
+    
+    if getgenv().SpeedBoost then
+        local hum = getHum()
+        if hum then hum.WalkSpeed = defaultWalkSpeed * getgenv().SpeedMultiplier end
+    else
+        local hum = getHum()
+        if hum and hum.WalkSpeed ~= defaultWalkSpeed and not getgenv().Fly then
+            hum.WalkSpeed = defaultWalkSpeed
+        end
+    end
+    
+    if getgenv().GodMode then
+        local hum = getHum()
+        if hum then
+            if hum.MaxHealth < 99999 then hum.MaxHealth = 99999 end
+            if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
+        end
+    end
+    
+    if getgenv().Noclip then
+        local c = getChar()
+        if c then
+            for _, p in pairs(c:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end
+    end
+    
+    if getgenv().ESPPlayers or getgenv().Tracers then
+        local players = cache.players
+        for i = 1, #players do
+            local p = players[i]
+            if p ~= Player then
+                local char = p.Character
+                if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                    local isTeam = isTeammate(p)
+                    if not getgenv().ESPTeammates and isTeam then
+                        if espCache[p] then
+                            espCache[p].line.Visible = false
+                            espCache[p].box.Visible = false
+                        end
+                        continue
                     end
-                    continue
+                    initDraw(p)
+                    local data = espCache[p]
+                    local root = char.HumanoidRootPart
+                    local screenPos, onScreen = getScreenData(root.Position)
+                    local distance = (cache.cameraPos - root.Position).Magnitude
+                    local color = isTeam and Color3.fromHSV(0.55, 1, 1) or Color3.fromHSV(math.clamp(distance / getgenv().MaxDistance, 0, 0.33), 1, 1)
+                    data.line.From = mid
+                    data.line.To = screenPos
+                    data.line.Color = color
+                    data.line.Visible = getgenv().Tracers
+                    if (getgenv().ESPPlayers or (getgenv().ESPTeammates and isTeam)) and onScreen then
+                        local size = math.clamp(2500 / distance, 5, 300)
+                        data.box.Size = Vector2.new(size, size * 1.5)
+                        data.box.Position = Vector2.new(screenPos.X - size / 2, screenPos.Y - size * 0.75)
+                        data.box.Color = color
+                        data.box.Visible = true
+                    else
+                        data.box.Visible = false
+                    end
+                elseif espCache[p] then
+                    espCache[p].line.Visible = false
+                    espCache[p].box.Visible = false
                 end
-                initDraw(p)
-                local data = espCache[p]
-                local root = char.HumanoidRootPart
-                local screenPos, onScreen = getScreenData(root.Position)
-                local distance = (Camera.CFrame.Position - root.Position).Magnitude
-                local color = isTeam and Color3.fromHSV(0.55, 1, 1) or Color3.fromHSV(math.clamp(distance / getgenv().MaxDistance, 0, 0.33), 1, 1)
-                data.line.From = mid
-                data.line.To = screenPos
-                data.line.Color = color
-                data.line.Visible = getgenv().Tracers
-                if (getgenv().ESPPlayers or (getgenv().ESPTeammates and isTeam)) and onScreen then
-                    local size = math.clamp(2500 / distance, 5, 300)
-                    data.box.Size = Vector2.new(size, size * 1.5)
-                    data.box.Position = Vector2.new(screenPos.X - size / 2, screenPos.Y - size * 0.75)
-                    data.box.Color = color
-                    data.box.Visible = true
-                else
-                    data.box.Visible = false
-                end
-            elseif espCache[p] then
-                espCache[p].line.Visible = false
-                espCache[p].box.Visible = false
             end
         end
     end
@@ -254,30 +560,78 @@ WelcomeGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 WelcomeGui.DisplayOrder = 1000
 WelcomeGui.Parent = CoreGui
 
+local WelcomeFrame = Instance.new("Frame")
+WelcomeFrame.Size = UDim2.new(1, 0, 1, 0)
+WelcomeFrame.BackgroundTransparency = 1
+WelcomeFrame.Parent = WelcomeGui
+
 local WelcomeText = Instance.new("TextLabel")
-WelcomeText.Size = UDim2.new(0, 400, 0, 60)
-WelcomeText.Position = UDim2.new(0.5, -200, 0.5, -30)
+WelcomeText.Size = UDim2.new(0, 500, 0, 80)
+WelcomeText.Position = UDim2.new(0.5, -250, 0.5, -40)
 WelcomeText.BackgroundTransparency = 1
-WelcomeText.Text = "Welcome〔V〕hub"
-WelcomeText.TextColor3 = Color3.fromRGB(255, 80, 80)
+WelcomeText.Text = "Welcome 〔V〕Hub v1"
+WelcomeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 WelcomeText.Font = Enum.Font.GothamBlack
-WelcomeText.TextSize = 28
+WelcomeText.TextSize = 36
 WelcomeText.TextTransparency = 1
-WelcomeText.Parent = WelcomeGui
+WelcomeText.ZIndex = 2
+WelcomeText.Parent = WelcomeFrame
+
+local welcomeGradient = Instance.new("UIGradient", WelcomeText)
+welcomeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 80, 80)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 100, 255)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 80, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+})
+welcomeGradient.Rotation = 0
+welcomeGradient.Enabled = false
+
+local glow = Instance.new("Frame")
+glow.Size = UDim2.new(0.1, 0, 1, 0)
+glow.Position = UDim2.new(-0.1, 0, 0, 0)
+glow.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+glow.BackgroundTransparency = 0.6
+glow.BorderSizePixel = 0
+glow.ZIndex = 3
+glow.Parent = WelcomeFrame
+Instance.new("UICorner", glow).CornerRadius = UDim.new(1, 0)
+
+local glowGradient = Instance.new("UIGradient", glow)
+glowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 255)),
+    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 180, 255))
+})
+glowGradient.Rotation = 90
 
 task.spawn(function()
     TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         TextTransparency = 0
     }):Play()
+    
     task.wait(2.5)
-    TweenService:Create(WelcomeText, TweenInfo.new(2.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+    
+    welcomeGradient.Enabled = true
+    
+    TweenService:Create(glow, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+        Position = UDim2.new(1.1, 0, 0, 0)
+    }):Play()
+    
+    task.wait(1)
+    
+    TweenService:Create(WelcomeText, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
         TextTransparency = 1
     }):Play()
-    task.wait(2.5)
+    TweenService:Create(glow, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        BackgroundTransparency = 1
+    }):Play()
+    
+    task.wait(2)
     WelcomeGui:Destroy()
 end)
-
-task.wait(2.5)
 
 local NotifGui = Instance.new("ScreenGui")
 NotifGui.Name = "VanezyNotif"
@@ -288,24 +642,46 @@ NotifGui.Parent = CoreGui
 
 local activeNotifications = {}
 
+local function removeNotification(nf, customButtons)
+    local idx = table.find(activeNotifications, nf)
+    if idx then table.remove(activeNotifications, idx) end
+    for i, n in ipairs(activeNotifications) do
+        local ny = 5 + ((i - 1) * (customButtons and 100 or 72))
+        pcall(function()
+            -- Определяем тип уведомления по его свойствам
+            local isConfirm = customButtons
+            local isFirst = (n.Title == "Notification" and n.Message:find("Vanezy Scripts"))
+            local tx, toff = 0.5, -135
+            if not isConfirm and not isFirst then
+                tx, toff = 1, -270
+            end
+            TweenService:Create(n, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Position = UDim2.new(tx, toff, 0, ny)
+            }):Play()
+        end)
+    end
+end
+
 function createNotification(title, message, duration, customButtons)
     duration = duration or 3
     while #activeNotifications >= 5 do
         local oldest = table.remove(activeNotifications, 1)
         if oldest and oldest.Parent then oldest:Destroy() end
     end
-    
     local nf = Instance.new("Frame")
-    local isSpecial = (title == "Notification" and message:find("Vanezy Scripts")) or customButtons
-    local isConfirm = customButtons
+    nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
     
-    if isSpecial or isConfirm then
-        nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
+    -- ОПРЕДЕЛЯЕМ ТИП УВЕДОМЛЕНИЯ
+    local isConfirm = customButtons  -- Подтверждение закрытия
+    local isFirst = (title == "Notification" and message:find("Vanezy Scripts"))  -- Первое уведомление
+    
+    -- ПОЗИЦИЯ:
+    if isConfirm or isFirst then
+        nf.Position = UDim2.new(0.5, -135, 0, -100)  -- По центру
     else
-        nf.Size = UDim2.new(0, 200, 0, customButtons and 70 or 48)
+        nf.Position = UDim2.new(1, -270, 0, -50)     -- Справа, высота -50
     end
     
-    nf.Position = UDim2.new(0.5, -135, 0, -100)
     nf.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
     nf.BorderSizePixel = 0
     nf.ClipsDescendants = true
@@ -313,7 +689,6 @@ function createNotification(title, message, duration, customButtons)
     Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 12)
     Instance.new("UIStroke", nf).Color = Color3.fromRGB(40, 40, 40)
     Instance.new("UIStroke", nf).Thickness = 1
-    
     local gradient = Instance.new("UIGradient", nf)
     local hue = 0
     task.spawn(function()
@@ -330,64 +705,42 @@ function createNotification(title, message, duration, customButtons)
             task.wait(0.03)
         end
     end)
-    
     local titleLabel = Instance.new("TextLabel")
-    if isSpecial or isConfirm then
-        titleLabel.Size = UDim2.new(1, customButtons and -12 or -35, 0, 20)
-        titleLabel.Position = UDim2.new(0, 12, 0, 8)
-        titleLabel.TextSize = 12
-    else
-        titleLabel.Size = UDim2.new(1, customButtons and -8 or -25, 0, 16)
-        titleLabel.Position = UDim2.new(0, 8, 0, 6)
-        titleLabel.TextSize = 10
-    end
+    titleLabel.Size = UDim2.new(1, customButtons and -12 or -35, 0, 20)
+    titleLabel.Position = UDim2.new(0, 12, 0, 8)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 12
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 10
     titleLabel.Parent = nf
-    
     local msgLabel = Instance.new("TextLabel")
-    if isSpecial or isConfirm then
-        msgLabel.Size = UDim2.new(1, -35, 0, customButtons and 20 or 18)
-        msgLabel.Position = UDim2.new(0, 12, 0, 28)
-        msgLabel.TextSize = 9
-    else
-        msgLabel.Size = UDim2.new(1, -25, 0, customButtons and 16 or 14)
-        msgLabel.Position = UDim2.new(0, 8, 0, 22)
-        msgLabel.TextSize = 8
-    end
+    msgLabel.Size = UDim2.new(1, -35, 0, customButtons and 20 or 18)
+    msgLabel.Position = UDim2.new(0, 12, 0, 28)
     msgLabel.BackgroundTransparency = 1
     msgLabel.Text = message
     msgLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
     msgLabel.Font = Enum.Font.Gotham
+    msgLabel.TextSize = 9
     msgLabel.TextXAlignment = Enum.TextXAlignment.Left
     msgLabel.RichText = true
     msgLabel.ZIndex = 10
     msgLabel.Parent = nf
-    
     local closeBtn
     if not customButtons then
         closeBtn = Instance.new("TextButton")
-        if isSpecial then
-            closeBtn.Size = UDim2.new(0, 18, 0, 18)
-            closeBtn.Position = UDim2.new(1, -24, 0, 7)
-            closeBtn.TextSize = 13
-        else
-            closeBtn.Size = UDim2.new(0, 14, 0, 14)
-            closeBtn.Position = UDim2.new(1, -18, 0, 5)
-            closeBtn.TextSize = 10
-        end
+        closeBtn.Size = UDim2.new(0, 18, 0, 18)
+        closeBtn.Position = UDim2.new(1, -24, 0, 7)
         closeBtn.BackgroundTransparency = 1
         closeBtn.Text = "x"
         closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
         closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 13
         closeBtn.ZIndex = 10
         closeBtn.Parent = nf
     end
-    
     local timeLine = Instance.new("Frame")
     timeLine.Size = UDim2.new(1, 0, 0, 2)
     timeLine.Position = UDim2.new(0, 0, 1, -2)
@@ -395,51 +748,45 @@ function createNotification(title, message, duration, customButtons)
     timeLine.BorderSizePixel = 0
     timeLine.ZIndex = 10
     timeLine.Parent = nf
-    
-    local yPos
-    if isSpecial or isConfirm then
-        yPos = 50 + (#activeNotifications * (customButtons and 100 or 72))
-    else
-        yPos = -5 + (#activeNotifications * (customButtons and 80 or 55))
-    end
-    
-    local xPos
-    if isSpecial or isConfirm then
-        xPos = 0.5
-        local offset = -135
-        nf.Position = UDim2.new(xPos, offset, 0, -100)
-        TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = UDim2.new(xPos, offset, 0, yPos)
-        }):Play()
-    else
-        xPos = 1
-        local offset = -210
-        nf.Position = UDim2.new(xPos, offset, 0, -100)
-        TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = UDim2.new(xPos, offset, 0, yPos)
-        }):Play()
-    end
-    
+    local yPos = -5 + (#activeNotifications * (customButtons and 100 or 72))
+
+local targetX, targetOffset
+if isConfirm or isFirst then
+    targetX = 0.5
+    targetOffset = -135
+else
+    targetX = 1
+    targetOffset = -270
+end
+
+TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    Position = UDim2.new(targetX, targetOffset, 0, yPos)
+}):Play()
     local lineTween = TweenService:Create(timeLine, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 2)})
     lineTween:Play()
-    
     local isClosed = false
     local function closeNotification()
         if isClosed then return end
         isClosed = true
         pcall(function() lineTween:Cancel() end)
-        local ht = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(xPos, (xPos == 0.5 and -135 or -210), 0, -100)})
+        local closeX, closeOffset
+if isConfirm or isFirst then
+    closeX = 0.5
+    closeOffset = -135
+else
+    closeX = 1
+    closeOffset = -270
+end
+local ht = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(closeX, closeOffset, 0, -100)})
         ht:Play()
         ht.Completed:Connect(function()
             if nf and nf.Parent then nf:Destroy() end
             removeNotification(nf, customButtons)
         end)
     end
-    
     if closeBtn then closeBtn.MouseButton1Click:Connect(closeNotification) end
     task.delay(duration, function() if not isClosed then closeNotification() end end)
     table.insert(activeNotifications, nf)
-    
     if customButtons then
         local btnFrame = Instance.new("Frame")
         btnFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -447,7 +794,6 @@ function createNotification(title, message, duration, customButtons)
         btnFrame.BackgroundTransparency = 1
         btnFrame.ZIndex = 10
         btnFrame.Parent = nf
-        
         local yesBtn = Instance.new("TextButton")
         yesBtn.Size = UDim2.new(0, 80, 0, 26)
         yesBtn.Position = UDim2.new(0.5, -90, 0.5, -13)
@@ -459,7 +805,6 @@ function createNotification(title, message, duration, customButtons)
         yesBtn.TextSize = 18
         yesBtn.Parent = btnFrame
         Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 8)
-        
         local noFrame = Instance.new("Frame")
         noFrame.Size = UDim2.new(0, 80, 0, 26)
         noFrame.Position = UDim2.new(0.5, 10, 0.5, -13)
@@ -469,7 +814,6 @@ function createNotification(title, message, duration, customButtons)
         Instance.new("UICorner", noFrame).CornerRadius = UDim.new(0, 8)
         Instance.new("UIStroke", noFrame).Color = Color3.fromRGB(255, 0, 0)
         Instance.new("UIStroke", noFrame).Thickness = 2
-        
         local noBtn = Instance.new("TextButton")
         noBtn.Size = UDim2.new(1, 0, 1, 0)
         noBtn.BackgroundTransparency = 1
@@ -478,7 +822,6 @@ function createNotification(title, message, duration, customButtons)
         noBtn.Font = Enum.Font.GothamBold
         noBtn.TextSize = 20
         noBtn.Parent = noFrame
-        
         return nf, yesBtn, noBtn, closeNotification
     end
     return nf
@@ -760,6 +1103,14 @@ local function updateStatusBar()
     if getgenv().Tracers then table.insert(activeFuncs, {name = "Trace", key = "Tracers"}) end
     if getgenv().AntiAFK then table.insert(activeFuncs, {name = "AFK", key = "AntiAFK"}) end
     if getgenv().AutoShoot then table.insert(activeFuncs, {name = "Shoot", key = "AutoShoot"}) end
+    if getgenv().Fly then table.insert(activeFuncs, {name = "Fly", key = "Fly"}) end
+    if getgenv().Noclip then table.insert(activeFuncs, {name = "Noclip", key = "Noclip"}) end
+    if getgenv().SpeedBoost then table.insert(activeFuncs, {name = "Speed", key = "SpeedBoost"}) end
+    if getgenv().InfiniteJump then table.insert(activeFuncs, {name = "Jump", key = "InfiniteJump"}) end
+    if getgenv().Triggerbot then table.insert(activeFuncs, {name = "Trigger", key = "Triggerbot"}) end
+    if getgenv().ESPWallCheck then table.insert(activeFuncs, {name = "WallCheck", key = "ESPWallCheck"}) end
+    if getgenv().GodMode then table.insert(activeFuncs, {name = "God", key = "GodMode"}) end
+if getgenv().FullBright then table.insert(activeFuncs, {name = "Bright", key = "FullBright"}) end
     
     if #activeFuncs == 0 then
         StatusText.Text = "No functions active"
@@ -903,6 +1254,12 @@ MinRightArrow.MouseButton1Click:Connect(function()
     if getgenv().Tracers then table.insert(activeFuncs, {name = "Trace", key = "Tracers"}) end
     if getgenv().AntiAFK then table.insert(activeFuncs, {name = "AFK", key = "AntiAFK"}) end
     if getgenv().AutoShoot then table.insert(activeFuncs, {name = "Shoot", key = "AutoShoot"}) end
+    if getgenv().Fly then table.insert(activeFuncs, {name = "Fly", key = "Fly"}) end
+    if getgenv().Noclip then table.insert(activeFuncs, {name = "Noclip", key = "Noclip"}) end
+    if getgenv().SpeedBoost then table.insert(activeFuncs, {name = "Speed", key = "SpeedBoost"}) end
+    if getgenv().InfiniteJump then table.insert(activeFuncs, {name = "Jump", key = "InfiniteJump"}) end
+    if getgenv().Triggerbot then table.insert(activeFuncs, {name = "Trigger", key = "Triggerbot"}) end
+    if getgenv().ESPWallCheck then table.insert(activeFuncs, {name = "WallCheck", key = "ESPWallCheck"}) end
     if #activeFuncs <= 1 then return end
     local idx = StatusBar:GetAttribute("CurrentIndex") or 1
     idx = idx + 1
@@ -1405,19 +1762,25 @@ espLabel.TextSize = 13
 espLabel.TextXAlignment = Enum.TextXAlignment.Left
 espLabel.Parent = espFrame
 
+local espGradient = Instance.new("UIGradient", espLabel)
+espGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(espFrame, "Highlights all players through walls with boxes. Toggle ON/OFF.")
 
 local espToggleBg = Instance.new("Frame")
-espToggleBg.Size = UDim2.new(0, 44, 0, 24)
-espToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+espToggleBg.Size = UDim2.new(0, 38, 0, 20)
+espToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 espToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 espToggleBg.BorderSizePixel = 0
 espToggleBg.Parent = espFrame
 Instance.new("UICorner", espToggleBg).CornerRadius = UDim.new(1, 0)
 
 local espToggleDot = Instance.new("Frame")
-espToggleDot.Size = UDim2.new(0, 20, 0, 20)
-espToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+espToggleDot.Size = UDim2.new(0, 16, 0, 16)
+espToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 espToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 espToggleDot.BorderSizePixel = 0
 espToggleDot.Parent = espToggleBg
@@ -1427,12 +1790,12 @@ espToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().ESPPlayers = not getgenv().ESPPlayers
         if getgenv().ESPPlayers then
-            espToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            espToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            espToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            espToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("ESP", "✅ ESP Players enabled", 4)
         else
             espToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            espToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            espToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("ESP", "❌ ESP Players disabled", 4)
         end
         updateStatusBar()
@@ -1458,19 +1821,25 @@ espTeamLabel.TextSize = 13
 espTeamLabel.TextXAlignment = Enum.TextXAlignment.Left
 espTeamLabel.Parent = espTeamFrame
 
+local espTeamGradient = Instance.new("UIGradient", espTeamLabel)
+espTeamGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(espTeamFrame, "Shows ESP on your teammates. Toggle ON/OFF.")
 
 local espTeamToggleBg = Instance.new("Frame")
-espTeamToggleBg.Size = UDim2.new(0, 44, 0, 24)
-espTeamToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+espTeamToggleBg.Size = UDim2.new(0, 38, 0, 20)
+espTeamToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 espTeamToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 espTeamToggleBg.BorderSizePixel = 0
 espTeamToggleBg.Parent = espTeamFrame
 Instance.new("UICorner", espTeamToggleBg).CornerRadius = UDim.new(1, 0)
 
 local espTeamToggleDot = Instance.new("Frame")
-espTeamToggleDot.Size = UDim2.new(0, 20, 0, 20)
-espTeamToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+espTeamToggleDot.Size = UDim2.new(0, 16, 0, 16)
+espTeamToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 espTeamToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 espTeamToggleDot.BorderSizePixel = 0
 espTeamToggleDot.Parent = espTeamToggleBg
@@ -1480,12 +1849,12 @@ espTeamToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().ESPTeammates = not getgenv().ESPTeammates
         if getgenv().ESPTeammates then
-            espTeamToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            espTeamToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            espTeamToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            espTeamToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("ESP Teammates", "✅ ESP Teammates enabled", 4)
         else
             espTeamToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            espTeamToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            espTeamToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("ESP Teammates", "❌ ESP Teammates disabled", 4)
         end
         updateStatusBar()
@@ -1511,19 +1880,25 @@ aimLabel.TextSize = 13
 aimLabel.TextXAlignment = Enum.TextXAlignment.Left
 aimLabel.Parent = aimFrame
 
+local aimGradient = Instance.new("UIGradient", aimLabel)
+aimGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(aimFrame, "Automatically aims at the nearest player. Adjust speed and FOV below.")
 
 local aimToggleBg = Instance.new("Frame")
-aimToggleBg.Size = UDim2.new(0, 44, 0, 24)
-aimToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+aimToggleBg.Size = UDim2.new(0, 38, 0, 20)
+aimToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 aimToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 aimToggleBg.BorderSizePixel = 0
 aimToggleBg.Parent = aimFrame
 Instance.new("UICorner", aimToggleBg).CornerRadius = UDim.new(1, 0)
 
 local aimToggleDot = Instance.new("Frame")
-aimToggleDot.Size = UDim2.new(0, 20, 0, 20)
-aimToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+aimToggleDot.Size = UDim2.new(0, 16, 0, 16)
+aimToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 aimToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 aimToggleDot.BorderSizePixel = 0
 aimToggleDot.Parent = aimToggleBg
@@ -1533,12 +1908,12 @@ aimToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().Aimbot = not getgenv().Aimbot
         if getgenv().Aimbot then
-            aimToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            aimToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            aimToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            aimToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Aimbot", "✅ Aimbot enabled", 4)
         else
             aimToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            aimToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            aimToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Aimbot", "❌ Aimbot disabled", 4)
         end
         updateStatusBar()
@@ -1564,19 +1939,25 @@ tracersLabel.TextSize = 13
 tracersLabel.TextXAlignment = Enum.TextXAlignment.Left
 tracersLabel.Parent = tracersFrame
 
+local tracersGradient = Instance.new("UIGradient", tracersLabel)
+tracersGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(tracersFrame, "Draws lines from your crosshair to all players. Toggle ON/OFF.")
 
 local tracersToggleBg = Instance.new("Frame")
-tracersToggleBg.Size = UDim2.new(0, 44, 0, 24)
-tracersToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+tracersToggleBg.Size = UDim2.new(0, 38, 0, 20)
+tracersToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 tracersToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 tracersToggleBg.BorderSizePixel = 0
 tracersToggleBg.Parent = tracersFrame
 Instance.new("UICorner", tracersToggleBg).CornerRadius = UDim.new(1, 0)
 
 local tracersToggleDot = Instance.new("Frame")
-tracersToggleDot.Size = UDim2.new(0, 20, 0, 20)
-tracersToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+tracersToggleDot.Size = UDim2.new(0, 16, 0, 16)
+tracersToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 tracersToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 tracersToggleDot.BorderSizePixel = 0
 tracersToggleDot.Parent = tracersToggleBg
@@ -1586,12 +1967,12 @@ tracersToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().Tracers = not getgenv().Tracers
         if getgenv().Tracers then
-            tracersToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            tracersToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            tracersToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            tracersToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Tracers", "✅ Tracers enabled", 4)
         else
             tracersToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            tracersToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            tracersToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Tracers", "❌ Tracers disabled", 4)
         end
         updateStatusBar()
@@ -1617,19 +1998,25 @@ autoShootLabel.TextSize = 13
 autoShootLabel.TextXAlignment = Enum.TextXAlignment.Left
 autoShootLabel.Parent = autoShootFrame
 
+local autoShootGradient = Instance.new("UIGradient", autoShootLabel)
+autoShootGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(autoShootFrame, "Automatically shoots when target is in crosshair.")
 
 local autoShootToggleBg = Instance.new("Frame")
-autoShootToggleBg.Size = UDim2.new(0, 44, 0, 24)
-autoShootToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+autoShootToggleBg.Size = UDim2.new(0, 38, 0, 20)
+autoShootToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 autoShootToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 autoShootToggleBg.BorderSizePixel = 0
 autoShootToggleBg.Parent = autoShootFrame
 Instance.new("UICorner", autoShootToggleBg).CornerRadius = UDim.new(1, 0)
 
 local autoShootToggleDot = Instance.new("Frame")
-autoShootToggleDot.Size = UDim2.new(0, 20, 0, 20)
-autoShootToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+autoShootToggleDot.Size = UDim2.new(0, 16, 0, 16)
+autoShootToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 autoShootToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 autoShootToggleDot.BorderSizePixel = 0
 autoShootToggleDot.Parent = autoShootToggleBg
@@ -1639,13 +2026,133 @@ autoShootToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AutoShoot = not getgenv().AutoShoot
         if getgenv().AutoShoot then
-            autoShootToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            autoShootToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            autoShootToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            autoShootToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Auto Shoot", "✅ Auto Shoot enabled", 4)
         else
             autoShootToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            autoShootToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            autoShootToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Auto Shoot", "❌ Auto Shoot disabled", 4)
+        end
+        updateStatusBar()
+    end
+end)
+
+local triggerFrame = Instance.new("Frame")
+triggerFrame.Size = UDim2.new(1, -16, 0, 42)
+triggerFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+triggerFrame.BackgroundTransparency = 0.6
+triggerFrame.BorderSizePixel = 0
+triggerFrame.Parent = mainContent
+Instance.new("UICorner", triggerFrame).CornerRadius = UDim.new(0, 6)
+
+local triggerLabel = Instance.new("TextLabel")
+triggerLabel.Size = UDim2.new(0.5, 0, 1, 0)
+triggerLabel.Position = UDim2.new(0, 28, 0, 0)
+triggerLabel.BackgroundTransparency = 1
+triggerLabel.Text = "Triggerbot"
+triggerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+triggerLabel.Font = Enum.Font.GothamBold
+triggerLabel.TextSize = 13
+triggerLabel.TextXAlignment = Enum.TextXAlignment.Left
+triggerLabel.Parent = triggerFrame
+
+local triggerGradient = Instance.new("UIGradient", triggerLabel)
+triggerGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(triggerFrame, "Auto-fires when crosshair is on enemy.")
+
+local triggerToggleBg = Instance.new("Frame")
+triggerToggleBg.Size = UDim2.new(0, 38, 0, 20)
+triggerToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+triggerToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+triggerToggleBg.BorderSizePixel = 0
+triggerToggleBg.Parent = triggerFrame
+Instance.new("UICorner", triggerToggleBg).CornerRadius = UDim.new(1, 0)
+
+local triggerToggleDot = Instance.new("Frame")
+triggerToggleDot.Size = UDim2.new(0, 16, 0, 16)
+triggerToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+triggerToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+triggerToggleDot.BorderSizePixel = 0
+triggerToggleDot.Parent = triggerToggleBg
+Instance.new("UICorner", triggerToggleDot).CornerRadius = UDim.new(1, 0)
+
+triggerToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().Triggerbot = not getgenv().Triggerbot
+        if getgenv().Triggerbot then
+            triggerToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            triggerToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Triggerbot", "✅ Enabled", 4)
+            enableTriggerbot()
+        else
+            triggerToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            triggerToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Triggerbot", "❌ Disabled", 4)
+            disableTriggerbot()
+        end
+        updateStatusBar()
+    end
+end)
+
+local espWallFrame = Instance.new("Frame")
+espWallFrame.Size = UDim2.new(1, -16, 0, 42)
+espWallFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+espWallFrame.BackgroundTransparency = 0.6
+espWallFrame.BorderSizePixel = 0
+espWallFrame.Parent = mainContent
+Instance.new("UICorner", espWallFrame).CornerRadius = UDim.new(0, 6)
+
+local espWallLabel = Instance.new("TextLabel")
+espWallLabel.Size = UDim2.new(0.5, 0, 1, 0)
+espWallLabel.Position = UDim2.new(0, 28, 0, 0)
+espWallLabel.BackgroundTransparency = 1
+espWallLabel.Text = "ESP Wall Check"
+espWallLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+espWallLabel.Font = Enum.Font.GothamBold
+espWallLabel.TextSize = 13
+espWallLabel.TextXAlignment = Enum.TextXAlignment.Left
+espWallLabel.Parent = espWallFrame
+
+local espWallGradient = Instance.new("UIGradient", espWallLabel)
+espWallGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(espWallFrame, "Only shows ESP on visible players.")
+
+local espWallToggleBg = Instance.new("Frame")
+espWallToggleBg.Size = UDim2.new(0, 38, 0, 20)
+espWallToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+espWallToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+espWallToggleBg.BorderSizePixel = 0
+espWallToggleBg.Parent = espWallFrame
+Instance.new("UICorner", espWallToggleBg).CornerRadius = UDim.new(1, 0)
+
+local espWallToggleDot = Instance.new("Frame")
+espWallToggleDot.Size = UDim2.new(0, 16, 0, 16)
+espWallToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+espWallToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+espWallToggleDot.BorderSizePixel = 0
+espWallToggleDot.Parent = espWallToggleBg
+Instance.new("UICorner", espWallToggleDot).CornerRadius = UDim.new(1, 0)
+
+espWallToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().ESPWallCheck = not getgenv().ESPWallCheck
+        if getgenv().ESPWallCheck then
+            espWallToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            espWallToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("ESP Wall Check", "✅ Enabled", 4)
+        else
+            espWallToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            espWallToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("ESP Wall Check", "❌ Disabled", 4)
         end
         updateStatusBar()
     end
@@ -1669,6 +2176,12 @@ aimSpeedLabel.Font = Enum.Font.Gotham
 aimSpeedLabel.TextSize = 10
 aimSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
 aimSpeedLabel.Parent = aimSpeedFrame
+
+local aimSpeedGradient = Instance.new("UIGradient", aimSpeedLabel)
+aimSpeedGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
 
 local aimSpeedHelpBtn = Instance.new("TextButton")
 aimSpeedHelpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -1756,6 +2269,12 @@ fovLabel.Font = Enum.Font.Gotham
 fovLabel.TextSize = 10
 fovLabel.TextXAlignment = Enum.TextXAlignment.Left
 fovLabel.Parent = fovFrame
+
+local fovGradient = Instance.new("UIGradient", fovLabel)
+fovGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
 
 local fovHelpBtn = Instance.new("TextButton")
 fovHelpBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -1846,19 +2365,25 @@ antiAFKLabel.TextSize = 13
 antiAFKLabel.TextXAlignment = Enum.TextXAlignment.Left
 antiAFKLabel.Parent = antiAFKFrame
 
-createHelpButton(antiAFKFrame, "Prevents Roblox from kicking you for being idle. Select time limit or set to forever.")
+local antiAFKGradient = Instance.new("UIGradient", antiAFKLabel)
+antiAFKGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(antiAFKFrame, "Prevents Roblox from kicking you for being idle.")
 
 local antiAFKToggleBg = Instance.new("Frame")
-antiAFKToggleBg.Size = UDim2.new(0, 44, 0, 24)
-antiAFKToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+antiAFKToggleBg.Size = UDim2.new(0, 38, 0, 20)
+antiAFKToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 antiAFKToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 antiAFKToggleBg.BorderSizePixel = 0
 antiAFKToggleBg.Parent = antiAFKFrame
 Instance.new("UICorner", antiAFKToggleBg).CornerRadius = UDim.new(1, 0)
 
 local antiAFKToggleDot = Instance.new("Frame")
-antiAFKToggleDot.Size = UDim2.new(0, 20, 0, 20)
-antiAFKToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+antiAFKToggleDot.Size = UDim2.new(0, 16, 0, 16)
+antiAFKToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 antiAFKToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 antiAFKToggleDot.BorderSizePixel = 0
 antiAFKToggleDot.Parent = antiAFKToggleBg
@@ -1868,13 +2393,383 @@ antiAFKToggleBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         getgenv().AntiAFK = not getgenv().AntiAFK
         if getgenv().AntiAFK then
-            antiAFKToggleBg.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            antiAFKToggleDot:TweenPosition(UDim2.new(1, -22, 0.5, -10), "Out", "Quad", 0.2, true)
+            antiAFKToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            antiAFKToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Anti AFK", "✅ Anti AFK enabled", 4)
         else
             antiAFKToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            antiAFKToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -10), "Out", "Quad", 0.2, true)
+            antiAFKToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
             createNotification("Anti AFK", "❌ Anti AFK disabled", 4)
+        end
+        updateStatusBar()
+    end
+end)
+
+-- Fly
+local flyFrame = Instance.new("Frame")
+flyFrame.Size = UDim2.new(1, -16, 0, 42)
+flyFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+flyFrame.BackgroundTransparency = 0.6
+flyFrame.BorderSizePixel = 0
+flyFrame.Parent = SettingsContent
+Instance.new("UICorner", flyFrame).CornerRadius = UDim.new(0, 6)
+
+local flyLabel = Instance.new("TextLabel")
+flyLabel.Size = UDim2.new(0.5, 0, 1, 0)
+flyLabel.Position = UDim2.new(0, 28, 0, 0)
+flyLabel.BackgroundTransparency = 1
+flyLabel.Text = "Fly"
+flyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyLabel.Font = Enum.Font.GothamBold
+flyLabel.TextSize = 13
+flyLabel.TextXAlignment = Enum.TextXAlignment.Left
+flyLabel.Parent = flyFrame
+
+local flyGradient = Instance.new("UIGradient", flyLabel)
+flyGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(flyFrame, "WASD to move, Space up, Shift down.")
+
+local flyToggleBg = Instance.new("Frame")
+flyToggleBg.Size = UDim2.new(0, 38, 0, 20)
+flyToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+flyToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flyToggleBg.BorderSizePixel = 0
+flyToggleBg.Parent = flyFrame
+Instance.new("UICorner", flyToggleBg).CornerRadius = UDim.new(1, 0)
+
+local flyToggleDot = Instance.new("Frame")
+flyToggleDot.Size = UDim2.new(0, 16, 0, 16)
+flyToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+flyToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+flyToggleDot.BorderSizePixel = 0
+flyToggleDot.Parent = flyToggleBg
+Instance.new("UICorner", flyToggleDot).CornerRadius = UDim.new(1, 0)
+
+flyToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().Fly = not getgenv().Fly
+        if getgenv().Fly then
+            flyToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            flyToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Fly", "✅ Enabled", 4)
+            enableFly()
+        else
+            flyToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            flyToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Fly", "❌ Disabled", 4)
+            disableFly()
+        end
+        updateStatusBar()
+    end
+end)
+
+-- Noclip
+local noclipFrame = Instance.new("Frame")
+noclipFrame.Size = UDim2.new(1, -16, 0, 42)
+noclipFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+noclipFrame.BackgroundTransparency = 0.6
+noclipFrame.BorderSizePixel = 0
+noclipFrame.Parent = SettingsContent
+Instance.new("UICorner", noclipFrame).CornerRadius = UDim.new(0, 6)
+
+local noclipLabel = Instance.new("TextLabel")
+noclipLabel.Size = UDim2.new(0.5, 0, 1, 0)
+noclipLabel.Position = UDim2.new(0, 28, 0, 0)
+noclipLabel.BackgroundTransparency = 1
+noclipLabel.Text = "Noclip"
+noclipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+noclipLabel.Font = Enum.Font.GothamBold
+noclipLabel.TextSize = 13
+noclipLabel.TextXAlignment = Enum.TextXAlignment.Left
+noclipLabel.Parent = noclipFrame
+
+local noclipGradient = Instance.new("UIGradient", noclipLabel)
+noclipGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(noclipFrame, "Walk through walls.")
+
+local noclipToggleBg = Instance.new("Frame")
+noclipToggleBg.Size = UDim2.new(0, 38, 0, 20)
+noclipToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+noclipToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+noclipToggleBg.BorderSizePixel = 0
+noclipToggleBg.Parent = noclipFrame
+Instance.new("UICorner", noclipToggleBg).CornerRadius = UDim.new(1, 0)
+
+local noclipToggleDot = Instance.new("Frame")
+noclipToggleDot.Size = UDim2.new(0, 16, 0, 16)
+noclipToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+noclipToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+noclipToggleDot.BorderSizePixel = 0
+noclipToggleDot.Parent = noclipToggleBg
+Instance.new("UICorner", noclipToggleDot).CornerRadius = UDim.new(1, 0)
+
+noclipToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().Noclip = not getgenv().Noclip
+        if getgenv().Noclip then
+            noclipToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            noclipToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Noclip", "✅ Enabled", 4)
+            enableNoclip()
+        else
+            noclipToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            noclipToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Noclip", "❌ Disabled", 4)
+            disableNoclip()
+        end
+        updateStatusBar()
+    end
+end)
+
+-- Speed Boost
+local speedFrame = Instance.new("Frame")
+speedFrame.Size = UDim2.new(1, -16, 0, 42)
+speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+speedFrame.BackgroundTransparency = 0.6
+speedFrame.BorderSizePixel = 0
+speedFrame.Parent = SettingsContent
+Instance.new("UICorner", speedFrame).CornerRadius = UDim.new(0, 6)
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0.5, 0, 1, 0)
+speedLabel.Position = UDim2.new(0, 28, 0, 0)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Speed Boost"
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.Font = Enum.Font.GothamBold
+speedLabel.TextSize = 13
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedLabel.Parent = speedFrame
+
+local speedGradient = Instance.new("UIGradient", speedLabel)
+speedGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(speedFrame, "x" .. getgenv().SpeedMultiplier .. " walk speed.")
+
+local speedToggleBg = Instance.new("Frame")
+speedToggleBg.Size = UDim2.new(0, 38, 0, 20)
+speedToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+speedToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedToggleBg.BorderSizePixel = 0
+speedToggleBg.Parent = speedFrame
+Instance.new("UICorner", speedToggleBg).CornerRadius = UDim.new(1, 0)
+
+local speedToggleDot = Instance.new("Frame")
+speedToggleDot.Size = UDim2.new(0, 16, 0, 16)
+speedToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+speedToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+speedToggleDot.BorderSizePixel = 0
+speedToggleDot.Parent = speedToggleBg
+Instance.new("UICorner", speedToggleDot).CornerRadius = UDim.new(1, 0)
+
+speedToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().SpeedBoost = not getgenv().SpeedBoost
+        if getgenv().SpeedBoost then
+            speedToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            speedToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Speed Boost", "✅ Enabled", 4)
+        else
+            speedToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            speedToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Speed Boost", "❌ Disabled", 4)
+            local hum = getHum()
+            if hum then hum.WalkSpeed = defaultWalkSpeed end
+        end
+        updateStatusBar()
+    end
+end)
+
+-- Infinite Jump
+local jumpFrame = Instance.new("Frame")
+jumpFrame.Size = UDim2.new(1, -16, 0, 42)
+jumpFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+jumpFrame.BackgroundTransparency = 0.6
+jumpFrame.BorderSizePixel = 0
+jumpFrame.Parent = SettingsContent
+Instance.new("UICorner", jumpFrame).CornerRadius = UDim.new(0, 6)
+
+local jumpLabel = Instance.new("TextLabel")
+jumpLabel.Size = UDim2.new(0.5, 0, 1, 0)
+jumpLabel.Position = UDim2.new(0, 28, 0, 0)
+jumpLabel.BackgroundTransparency = 1
+jumpLabel.Text = "Infinite Jump"
+jumpLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+jumpLabel.Font = Enum.Font.GothamBold
+jumpLabel.TextSize = 13
+jumpLabel.TextXAlignment = Enum.TextXAlignment.Left
+jumpLabel.Parent = jumpFrame
+
+local jumpGradient = Instance.new("UIGradient", jumpLabel)
+jumpGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(jumpFrame, "Jump infinitely in the air.")
+
+local jumpToggleBg = Instance.new("Frame")
+jumpToggleBg.Size = UDim2.new(0, 38, 0, 20)
+jumpToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+jumpToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+jumpToggleBg.BorderSizePixel = 0
+jumpToggleBg.Parent = jumpFrame
+Instance.new("UICorner", jumpToggleBg).CornerRadius = UDim.new(1, 0)
+
+local jumpToggleDot = Instance.new("Frame")
+jumpToggleDot.Size = UDim2.new(0, 16, 0, 16)
+jumpToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+jumpToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+jumpToggleDot.BorderSizePixel = 0
+jumpToggleDot.Parent = jumpToggleBg
+Instance.new("UICorner", jumpToggleDot).CornerRadius = UDim.new(1, 0)
+
+jumpToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().InfiniteJump = not getgenv().InfiniteJump
+        if getgenv().InfiniteJump then
+            jumpToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            jumpToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Infinite Jump", "✅ Enabled", 4)
+        else
+            jumpToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            jumpToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            createNotification("Infinite Jump", "❌ Disabled", 4)
+        end
+        updateStatusBar()
+    end
+end)
+
+-- God Mode
+local godFrame = Instance.new("Frame")
+godFrame.Size = UDim2.new(1, -16, 0, 42)
+godFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+godFrame.BackgroundTransparency = 0.6
+godFrame.BorderSizePixel = 0
+godFrame.Parent = SettingsContent
+Instance.new("UICorner", godFrame).CornerRadius = UDim.new(0, 6)
+
+local godLabel = Instance.new("TextLabel")
+godLabel.Size = UDim2.new(0.5, 0, 1, 0)
+godLabel.Position = UDim2.new(0, 28, 0, 0)
+godLabel.BackgroundTransparency = 1
+godLabel.Text = "God Mode"
+godLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+godLabel.Font = Enum.Font.GothamBold
+godLabel.TextSize = 13
+godLabel.TextXAlignment = Enum.TextXAlignment.Left
+godLabel.Parent = godFrame
+
+local godGradient = Instance.new("UIGradient", godLabel)
+godGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(godFrame, "Makes you invincible. Health restores every frame.")
+
+local godToggleBg = Instance.new("Frame")
+godToggleBg.Size = UDim2.new(0, 38, 0, 20)
+godToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+godToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+godToggleBg.BorderSizePixel = 0
+godToggleBg.Parent = godFrame
+Instance.new("UICorner", godToggleBg).CornerRadius = UDim.new(1, 0)
+
+local godToggleDot = Instance.new("Frame")
+godToggleDot.Size = UDim2.new(0, 16, 0, 16)
+godToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+godToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+godToggleDot.BorderSizePixel = 0
+godToggleDot.Parent = godToggleBg
+Instance.new("UICorner", godToggleDot).CornerRadius = UDim.new(1, 0)
+
+godToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().GodMode = not getgenv().GodMode
+        if getgenv().GodMode then
+            godToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            godToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            enableGodMode()
+            createNotification("God Mode", "✅ Enabled", 4)
+        else
+            godToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            godToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            disableGodMode()
+            createNotification("God Mode", "❌ Disabled", 4)
+        end
+        updateStatusBar()
+    end
+end)
+
+-- Full Bright
+local brightFrame = Instance.new("Frame")
+brightFrame.Size = UDim2.new(1, -16, 0, 42)
+brightFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+brightFrame.BackgroundTransparency = 0.6
+brightFrame.BorderSizePixel = 0
+brightFrame.Parent = SettingsContent
+Instance.new("UICorner", brightFrame).CornerRadius = UDim.new(0, 6)
+
+local brightLabel = Instance.new("TextLabel")
+brightLabel.Size = UDim2.new(0.5, 0, 1, 0)
+brightLabel.Position = UDim2.new(0, 28, 0, 0)
+brightLabel.BackgroundTransparency = 1
+brightLabel.Text = "Full Bright"
+brightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+brightLabel.Font = Enum.Font.GothamBold
+brightLabel.TextSize = 13
+brightLabel.TextXAlignment = Enum.TextXAlignment.Left
+brightLabel.Parent = brightFrame
+
+local brightGradient = Instance.new("UIGradient", brightLabel)
+brightGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
+createHelpButton(brightFrame, "Makes the game bright like daytime. Works in dark maps.")
+
+local brightToggleBg = Instance.new("Frame")
+brightToggleBg.Size = UDim2.new(0, 38, 0, 20)
+brightToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
+brightToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+brightToggleBg.BorderSizePixel = 0
+brightToggleBg.Parent = brightFrame
+Instance.new("UICorner", brightToggleBg).CornerRadius = UDim.new(1, 0)
+
+local brightToggleDot = Instance.new("Frame")
+brightToggleDot.Size = UDim2.new(0, 16, 0, 16)
+brightToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
+brightToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+brightToggleDot.BorderSizePixel = 0
+brightToggleDot.Parent = brightToggleBg
+Instance.new("UICorner", brightToggleDot).CornerRadius = UDim.new(1, 0)
+
+brightToggleBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        getgenv().FullBright = not getgenv().FullBright
+        if getgenv().FullBright then
+            brightToggleBg.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
+            brightToggleDot:TweenPosition(UDim2.new(1, -18, 0.5, -8), "Out", "Quad", 0.2, true)
+            enableFullBright()
+            createNotification("Full Bright", "✅ Enabled", 4)
+        else
+            brightToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            brightToggleDot:TweenPosition(UDim2.new(0, 2, 0.5, -8), "Out", "Quad", 0.2, true)
+            disableFullBright()
+            createNotification("Full Bright", "❌ Disabled", 4)
         end
         updateStatusBar()
     end
@@ -1899,19 +2794,25 @@ saveLabel.TextSize = 13
 saveLabel.TextXAlignment = Enum.TextXAlignment.Left
 saveLabel.Parent = saveFrame
 
+local saveGradient = Instance.new("UIGradient", saveLabel)
+saveGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+})
+
 createHelpButton(saveFrame, "Saves your settings to a file. When you reload the script, settings will be restored automatically.")
 
 local saveToggleBg = Instance.new("Frame")
-saveToggleBg.Size = UDim2.new(0, 44, 0, 24)
-saveToggleBg.Position = UDim2.new(1, -54, 0.5, -12)
+saveToggleBg.Size = UDim2.new(0, 38, 0, 20)
+saveToggleBg.Position = UDim2.new(1, -48, 0.5, -10)
 saveToggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 saveToggleBg.BorderSizePixel = 0
 saveToggleBg.Parent = saveFrame
 Instance.new("UICorner", saveToggleBg).CornerRadius = UDim.new(1, 0)
 
 local saveToggleDot = Instance.new("Frame")
-saveToggleDot.Size = UDim2.new(0, 20, 0, 20)
-saveToggleDot.Position = UDim2.new(0, 2, 0.5, -10)
+saveToggleDot.Size = UDim2.new(0, 16, 0, 16)
+saveToggleDot.Position = UDim2.new(0, 2, 0.5, -8)
 saveToggleDot.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
 saveToggleDot.BorderSizePixel = 0
 saveToggleDot.Parent = saveToggleBg
@@ -2000,9 +2901,7 @@ local savedPosition = nil
 
 ToggleBtn.MouseButton1Click:Connect(function()
     if guiVisible then
-        -- Сохраняем текущую позицию перед сворачиванием
         savedPosition = MainFrame.Position
-        
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
             Size = UDim2.new(0, GUI_WIDTH, 0, 0),
@@ -2017,14 +2916,11 @@ ToggleBtn.MouseButton1Click:Connect(function()
         MainGui.Enabled = true
         MainFrame.BackgroundTransparency = 1
         MainFrame.Size = UDim2.new(0, GUI_WIDTH, 0, 0)
-        
-        -- Если есть сохранённая позиция - используем её, иначе начальная
         if savedPosition then
             MainFrame.Position = savedPosition
         else
             MainFrame.Position = UDim2.new(0, 25, 0.5, -GUI_HEIGHT / 2)
         end
-        
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             BackgroundTransparency = 0,
             Size = UDim2.new(0, GUI_WIDTH, 0, GUI_HEIGHT)
@@ -2095,6 +2991,14 @@ if TabContents["Home"] then
 end
 
 task.wait(0.5)
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        if getgenv().Aimbot then
+            silentShoot()
+        end
+    end
+end)
 createNotification("Notification", "The script was created by the Vanezy Scripts team", 5)
 
 print("〔V〕Hub v1 loaded!")
