@@ -1,3 +1,18 @@
+local function bypassByfron()
+    local g = getrawmetatable(game)
+    if not g then return end
+    local old = g.__namecall
+    setreadonly(g, false)
+    g.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        if args[1] == "FireServer" and not checkcaller() then
+            return nil
+        end
+        return old(self, ...)
+    end)
+    setreadonly(g, true)
+end
+bypassByfron()
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
@@ -29,6 +44,8 @@ getgenv().FlySpeed = 60
 getgenv().SpeedMultiplier = 2.5
 getgenv().GodMode = false
 getgenv().FullBright = false
+
+local cache = { frameSkip = 0, players = {}, cameraPos = Vector3.new() }
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
