@@ -44,7 +44,16 @@ local defaultWalkSpeed = 16
 local flyBodyVelocity = nil
 local noclipParts = {}
 local triggerbotConn = nil
+local cache = {
+    frameSkip = 0,
+    players = {},
+    cameraPos = Vector3.new()
+}
 
+local function updateCache()
+    cache.cameraPos = Camera.CFrame.Position
+    cache.players = Players:GetPlayers()
+end
 local function getChar()
     return Player.Character
 end
@@ -413,38 +422,28 @@ local function disableGodMode()
 end
 
 local function enableFullBright()
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.Plastic
-            v.BrickColor = BrickColor.new("White")
-        end
-    end
-    game.Lighting.Brightness = 2
+    game.Lighting.Brightness = 1.5
     game.Lighting.ClockTime = 12
     game.Lighting.FogEnd = 100000
     game.Lighting.GlobalShadows = false
-    game.Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-    game.Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    game.Lighting.OutdoorAmbient = Color3.fromRGB(200, 200, 200)
+    game.Lighting.Ambient = Color3.fromRGB(200, 200, 200)
 end
 
 local function disableFullBright()
-    game.Lighting.Brightness = 0.5
-    game.Lighting.ClockTime = 0
-    game.Lighting.FogEnd = 1000
+    game.Lighting.Brightness = 1
+    game.Lighting.ClockTime = 14
+    game.Lighting.FogEnd = 10000
     game.Lighting.GlobalShadows = true
-    game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    game.Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+    game.Lighting.OutdoorAmbient = Color3.fromRGB(105, 105, 105)
+    game.Lighting.Ambient = Color3.fromRGB(105, 105, 105)
 end
 
 local renderConnection
 renderConnection = RunService.RenderStepped:Connect(function()
     cache.frameSkip = cache.frameSkip + 1
     if cache.frameSkip % 2 == 0 then return end
-    
-    if not getgenv().ESPPlayers and not getgenv().Aimbot and not getgenv().Tracers and not getgenv().Fly and not getgenv().Noclip then
-        return
-    end
-    
+
     updateCache()
     local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
@@ -650,7 +649,7 @@ local function removeNotification(nf, customButtons)
         pcall(function()
             -- Определяем тип уведомления по его свойствам
             local isConfirm = customButtons
-            local isFirst = (n.Title == "Notification" and n.Message:find("Vanezy Scripts"))
+            local isFirst = false
             local tx, toff = 0.5, -135
             if not isConfirm and not isFirst then
                 tx, toff = 1, -270
