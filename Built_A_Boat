@@ -7,7 +7,6 @@ local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 local Mouse = Player:GetMouse()
 
--- ===== ДОБАВЛЕНО: ОБЪЯВЛЕНИЕ cache =====
 local cache = { frameSkip = 0, players = {}, cameraPos = Vector3.new() }
 
 getgenv().ESPPlayers = false
@@ -64,6 +63,7 @@ end
 
 local function hasLOS(origin, target)
     local dir = target - origin
+    if dir.Magnitude < 0.01 then return true end
     local rp = RaycastParams.new()
     rp.FilterType = Enum.RaycastFilterType.Exclude
     local ex = {}
@@ -74,7 +74,6 @@ local function hasLOS(origin, target)
     return workspace:Raycast(origin, dir.Unit * dir.Magnitude, rp) == nil
 end
 
--- ===== ИСПРАВЛЕНО: InfiniteJump через UIS.InputBegan =====
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.Space and getgenv().InfiniteJump then
@@ -113,7 +112,6 @@ end
 
 local silentAimTarget = nil
 
--- ===== ИСПРАВЛЕНО: continue заменены на goto =====
 local function getSilentAimTarget()
     local target, nearest = nil, getgenv().FOVSize
     local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -149,7 +147,6 @@ local function silentShoot()
     
     local targetPos = target.Position + Vector3.new(0, 0.5, 0)
     
-    -- Отправляем выстрел в цель
     for _, obj in ipairs(tool:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
             pcall(function() obj:FireServer(targetPos, target, Vector3.new(0, 1, 0)) end)
@@ -158,7 +155,6 @@ local function silentShoot()
         end
     end
     
-    -- Общие названия RemoteEvent
     for _, name in ipairs({"Fire", "Shoot", "RemoteEvent", "Hit", "Replicate"}) do
         local r = tool:FindFirstChild(name)
         if r and r:IsA("RemoteEvent") then
@@ -167,7 +163,6 @@ local function silentShoot()
         end
     end
     
-    -- Для Rivals через ReplicatedStorage
     pcall(function()
         local hitRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Hit")
         if hitRemote then
@@ -176,7 +171,6 @@ local function silentShoot()
     end)
 end
 
--- ===== ИСПРАВЛЕНО: добавлен учет AimPart =====
 local function findBestTarget()
     local target, nearest = nil, getgenv().FOVSize
     local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -239,7 +233,6 @@ local function findBestTarget()
     return target
 end
 
--- ===== ИСПРАВЛЕНО: удален mouse1click =====
 local function performShoot()
     local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
     if not tool then return end
@@ -250,26 +243,14 @@ local function performShoot()
     
     pcall(function() tool:Activate() end)
     
-    if UIS.TouchEnabled then
-        pcall(function()
-            local mouse = Player:GetMouse()
-            if mouse then
-                mouse.Button1Down:Fire()
-                task.wait(0.02)
-                mouse.Button1Up:Fire()
-            end
-        end)
-    else
-        -- Эмуляция через UIS (для эксплоитов без mouse1click)
-        pcall(function()
-            local mouse = Player:GetMouse()
-            if mouse and mouse.Button1Down then
-                mouse.Button1Down:Fire()
-                task.wait(0.02)
-                mouse.Button1Up:Fire()
-            end
-        end)
-    end
+    pcall(function()
+        local mouse = Player:GetMouse()
+        if mouse and mouse.Button1Down then
+            mouse.Button1Down:Fire()
+            task.wait(0.02)
+            mouse.Button1Up:Fire()
+        end
+    end)
 end
 
 local function autoShoot()
@@ -303,7 +284,6 @@ task.spawn(function()
     end
 end)
 
--- ===== ИСПРАВЛЕНО: очистка espCache через цикл =====
 local function cleanupESP()
     getgenv().ESPPlayers = false
     getgenv().ESPTeammates = false
@@ -317,7 +297,6 @@ local function cleanupESP()
     pcall(function() if fovCircle then fovCircle:Remove() end end)
 end
 
--- ===== FLY =====
 local function enableFly()
     if flyBodyVelocity then return end
     local hrp = getHRP()
@@ -334,7 +313,6 @@ local function disableFly()
     end
 end
 
--- ===== NOCLIP =====
 local function enableNoclip()
     local c = getChar()
     if not c then return end
@@ -353,7 +331,6 @@ local function disableNoclip()
     noclipParts = {}
 end
 
--- ===== TRIGGERBOT =====
 local function triggerFireTool(enemyChar, hitPart)
     local char = getChar()
     if not char then return end
@@ -361,9 +338,10 @@ local function triggerFireTool(enemyChar, hitPart)
     if not tool then return end
     local hitPos = hitPart and hitPart.Position or Mouse.Hit.Position
     for _, obj in ipairs(tool:GetDescendants()) do
-        if not obj:IsA("RemoteEvent") then continue end
+        if not obj:IsA("RemoteEvent") then goto skipRemote end
         pcall(function() obj:FireServer(hitPos, hitPart) end)
         pcall(function() obj:FireServer(hitPos) end)
+        ::skipRemote::
     end
     for _, name in ipairs({"RE","Fire","Shoot","FireWeapon","ShootEvent","RemoteEvent"}) do
         local r = tool:FindFirstChild(name)
@@ -378,22 +356,26 @@ local function getEnemyAtCrosshair()
     local mPos = UIS:GetMouseLocation()
     local myHRP = getHRP()
     for _, p in pairs(Players:GetPlayers()) do
-        if p == Player then continue end
+        if p == Player then goto skipPlayer end
         local char = p.Character
-        if not char then continue end
+        if not char then goto skipPlayer end
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then continue end
-        if isTeammate(p) then continue end
+        if not hum or hum.Health <= 0 then goto skipPlayer end
+        if isTeammate(p) then goto skipPlayer end
         local parts = {"Head", "HumanoidRootPart"}
         for _, partName in ipairs(parts) do
             local part = char:FindFirstChild(partName)
-            if not part then continue end
-            if myHRP and getgenv().ESPWallCheck and not hasLOS(myHRP.Position, part.Position) then continue end
+            if not part then goto skipPart end
+            if myHRP and getgenv().ESPWallCheck and not hasLOS(myHRP.Position, part.Position) then goto skipPart end
             local vPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if not onScreen or vPos.Z <= 0 then continue end
+            if not onScreen or vPos.Z <= 0 then goto skipPart end
             local d = (Vector2.new(vPos.X, vPos.Y) - mPos).Magnitude
-            if d < 50 then return part end
+            if d < 50 then
+                return part
+            end
+            ::skipPart::
         end
+        ::skipPlayer::
     end
     return nil
 end
@@ -452,13 +434,11 @@ local function disableFullBright()
     game.Lighting.Ambient = Color3.fromRGB(128, 128, 128)
 end
 
--- ===== ДОБАВЛЕНА ФУНКЦИЯ updateCache =====
 local function updateCache()
     cache.players = game.Players:GetPlayers()
     cache.cameraPos = Camera.CFrame.Position
 end
 
--- ===== ДОБАВЛЕН ОБРАБОТЧИК РЕСПАВНА =====
 Player.CharacterAdded:Connect(function(char)
     task.wait(0.5)
     if getgenv().Fly then enableFly() end
@@ -2437,7 +2417,6 @@ antiAFKToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Fly
 local flyFrame = Instance.new("Frame")
 flyFrame.Size = UDim2.new(1, -16, 0, 42)
 flyFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2499,7 +2478,6 @@ flyToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Noclip
 local noclipFrame = Instance.new("Frame")
 noclipFrame.Size = UDim2.new(1, -16, 0, 42)
 noclipFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2561,7 +2539,6 @@ noclipToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Speed Boost
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, -16, 0, 42)
 speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2623,7 +2600,6 @@ speedToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Infinite Jump
 local jumpFrame = Instance.new("Frame")
 jumpFrame.Size = UDim2.new(1, -16, 0, 42)
 jumpFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2683,7 +2659,6 @@ jumpToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- God Mode
 local godFrame = Instance.new("Frame")
 godFrame.Size = UDim2.new(1, -16, 0, 42)
 godFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2745,7 +2720,6 @@ godToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
--- Full Bright
 local brightFrame = Instance.new("Frame")
 brightFrame.Size = UDim2.new(1, -16, 0, 42)
 brightFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
