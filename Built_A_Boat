@@ -7,8 +7,6 @@ local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 local Mouse = Player:GetMouse()
 
-local cache = { frameSkip = 0, players = {}, cameraPos = Vector3.new() }
-
 getgenv().ESPPlayers = false
 getgenv().ESPTeammates = false
 getgenv().Aimbot = false
@@ -63,7 +61,6 @@ end
 
 local function hasLOS(origin, target)
     local dir = target - origin
-    if dir.Magnitude < 0.01 then return true end
     local rp = RaycastParams.new()
     rp.FilterType = Enum.RaycastFilterType.Exclude
     local ex = {}
@@ -74,9 +71,8 @@ local function hasLOS(origin, target)
     return workspace:Raycast(origin, dir.Unit * dir.Magnitude, rp) == nil
 end
 
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Space and getgenv().InfiniteJump then
+UIS.JumpRequest:Connect(function()
+    if getgenv().InfiniteJump then
         local hum = getHum()
         if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
@@ -117,21 +113,21 @@ local function getSilentAimTarget()
     local mid = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     for _, p in pairs(Players:GetPlayers()) do
-        if p == Player then goto skipPlayer end
-        if not p.Character then goto skipPlayer end
-        local hum = p.Character:FindFirstChild("Humanoid")
-        local head = p.Character:FindFirstChild("Head")
-        if not hum or not head or hum.Health <= 0 then goto skipPlayer end
-        if isTeammate(p) then goto skipPlayer end
-        local screen, visible = Camera:WorldToViewportPoint(head.Position)
-        if visible then
-            local dist = (Vector2.new(screen.X, screen.Y) - mid).Magnitude
-            if dist < getgenv().FOVSize and dist < nearest then
-                nearest = dist
-                target = head
+        if p ~= Player and p.Character then
+            local hum = p.Character:FindFirstChild("Humanoid")
+            local head = p.Character:FindFirstChild("Head")
+            if hum and head and hum.Health > 0 then
+                if isTeammate(p) then continue end
+                local screen, visible = Camera:WorldToViewportPoint(head.Position)
+                if visible then
+                    local dist = (Vector2.new(screen.X, screen.Y) - mid).Magnitude
+                    if dist < getgenv().FOVSize and dist < nearest then
+                        nearest = dist
+                        target = head
+                    end
+                end
             end
         end
-        ::skipPlayer::
     end
     return target
 end
@@ -147,6 +143,7 @@ local function silentShoot()
     
     local targetPos = target.Position + Vector3.new(0, 0.5, 0)
     
+    -- Отправляем выстрел в цель
     for _, obj in ipairs(tool:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
             pcall(function() obj:FireServer(targetPos, target, Vector3.new(0, 1, 0)) end)
@@ -155,6 +152,7 @@ local function silentShoot()
         end
     end
     
+    -- Общие названия RemoteEvent
     for _, name in ipairs({"Fire", "Shoot", "RemoteEvent", "Hit", "Replicate"}) do
         local r = tool:FindFirstChild(name)
         if r and r:IsA("RemoteEvent") then
@@ -163,6 +161,7 @@ local function silentShoot()
         end
     end
     
+    -- Для Rivals через ReplicatedStorage
     pcall(function()
         local hitRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Hit")
         if hitRemote then
@@ -193,7 +192,7 @@ local function findBestTarget()
             local humanoid = p.Character:FindFirstChild("Humanoid")
             if humanoid and humanoid.Health > 0 then
                 if not isTeammate(p) then
-                    local parts = {getgenv().AimPart, "Torso", "HumanoidRootPart"}
+                    local parts = {"Head", "Torso", "HumanoidRootPart"}
                     for _, partName in ipairs(parts) do
                         local hitPart = p.Character:FindFirstChild(partName)
                         if hitPart then
@@ -210,7 +209,7 @@ local function findBestTarget()
                                 if getgenv().ESPWallCheck then
                                     local myHRP = getHRP()
                                     if myHRP and not hasLOS(myHRP.Position, hitPart.Position) then
-                                        goto continuePart
+                                        continue
                                     end
                                 end
                                 if score < nearest then
@@ -219,7 +218,6 @@ local function findBestTarget()
                                 end
                             end
                         end
-                        ::continuePart::
                     end
                 end
             end
@@ -243,14 +241,20 @@ local function performShoot()
     
     pcall(function() tool:Activate() end)
     
-    pcall(function()
-        local mouse = Player:GetMouse()
-        if mouse and mouse.Button1Down then
-            mouse.Button1Down:Fire()
-            task.wait(0.02)
-            mouse.Button1Up:Fire()
-        end
-    end)
+    if UIS.TouchEnabled then
+        pcall(function()
+            local mouse = Player:GetMouse()
+            if mouse then
+                mouse.Button1Down:Fire()
+                task.wait(0.02)
+                mouse.Button1Up:Fire()
+            end
+        end)
+    else
+        pcall(function()
+            if mouse1click then mouse1click() end
+        end)
+    end
 end
 
 local function autoShoot()
@@ -290,13 +294,14 @@ local function cleanupESP()
     getgenv().Tracers = false
     getgenv().Aimbot = false
     for _, data in pairs(espCache) do
-        pcall(function() if data.line then data.line:Remove() end end)
-        pcall(function() if data.box then data.box:Remove() end end)
+        if data.line then data.line:Remove() end
+        if data.box then data.box:Remove() end
     end
-    for k in pairs(espCache) do espCache[k] = nil end
-    pcall(function() if fovCircle then fovCircle:Remove() end end)
+    table.clear(espCache)
+    if fovCircle then fovCircle:Remove() end
 end
 
+-- ===== FLY =====
 local function enableFly()
     if flyBodyVelocity then return end
     local hrp = getHRP()
@@ -313,6 +318,7 @@ local function disableFly()
     end
 end
 
+-- ===== NOCLIP =====
 local function enableNoclip()
     local c = getChar()
     if not c then return end
@@ -331,6 +337,7 @@ local function disableNoclip()
     noclipParts = {}
 end
 
+-- ===== TRIGGERBOT =====
 local function triggerFireTool(enemyChar, hitPart)
     local char = getChar()
     if not char then return end
@@ -338,10 +345,9 @@ local function triggerFireTool(enemyChar, hitPart)
     if not tool then return end
     local hitPos = hitPart and hitPart.Position or Mouse.Hit.Position
     for _, obj in ipairs(tool:GetDescendants()) do
-        if not obj:IsA("RemoteEvent") then goto skipRemote end
+        if not obj:IsA("RemoteEvent") then continue end
         pcall(function() obj:FireServer(hitPos, hitPart) end)
         pcall(function() obj:FireServer(hitPos) end)
-        ::skipRemote::
     end
     for _, name in ipairs({"RE","Fire","Shoot","FireWeapon","ShootEvent","RemoteEvent"}) do
         local r = tool:FindFirstChild(name)
@@ -356,26 +362,22 @@ local function getEnemyAtCrosshair()
     local mPos = UIS:GetMouseLocation()
     local myHRP = getHRP()
     for _, p in pairs(Players:GetPlayers()) do
-        if p == Player then goto skipPlayer end
+        if p == Player then continue end
         local char = p.Character
-        if not char then goto skipPlayer end
+        if not char then continue end
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then goto skipPlayer end
-        if isTeammate(p) then goto skipPlayer end
+        if not hum or hum.Health <= 0 then continue end
+        if isTeammate(p) then continue end
         local parts = {"Head", "HumanoidRootPart"}
         for _, partName in ipairs(parts) do
             local part = char:FindFirstChild(partName)
-            if not part then goto skipPart end
-            if myHRP and getgenv().ESPWallCheck and not hasLOS(myHRP.Position, part.Position) then goto skipPart end
+            if not part then continue end
+            if myHRP and getgenv().ESPWallCheck and not hasLOS(myHRP.Position, part.Position) then continue end
             local vPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if not onScreen or vPos.Z <= 0 then goto skipPart end
+            if not onScreen or vPos.Z <= 0 then continue end
             local d = (Vector2.new(vPos.X, vPos.Y) - mPos).Magnitude
-            if d < 50 then
-                return part
-            end
-            ::skipPart::
+            if d < 50 then return part end
         end
-        ::skipPlayer::
     end
     return nil
 end
@@ -433,19 +435,6 @@ local function disableFullBright()
     game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     game.Lighting.Ambient = Color3.fromRGB(128, 128, 128)
 end
-
-local function updateCache()
-    cache.players = game.Players:GetPlayers()
-    cache.cameraPos = Camera.CFrame.Position
-end
-
-Player.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if getgenv().Fly then enableFly() end
-    if getgenv().Noclip then enableNoclip() end
-    if getgenv().GodMode then enableGodMode() end
-    if getgenv().FullBright then enableFullBright() end
-end)
 
 local renderConnection
 renderConnection = RunService.RenderStepped:Connect(function()
@@ -521,7 +510,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
                             espCache[p].line.Visible = false
                             espCache[p].box.Visible = false
                         end
-                        goto continueESP
+                        continue
                     end
                     initDraw(p)
                     local data = espCache[p]
@@ -546,7 +535,6 @@ renderConnection = RunService.RenderStepped:Connect(function()
                     espCache[p].line.Visible = false
                     espCache[p].box.Visible = false
                 end
-                ::continueESP::
             end
         end
     end
@@ -554,8 +542,8 @@ end)
 
 Players.PlayerRemoving:Connect(function(p)
     if espCache[p] then
-        pcall(function() espCache[p].line:Remove() end)
-        pcall(function() espCache[p].box:Remove() end)
+        espCache[p].line:Remove()
+        espCache[p].box:Remove()
         espCache[p] = nil
     end
 end)
@@ -655,14 +643,12 @@ NotifGui.Parent = CoreGui
 local activeNotifications = {}
 
 local function removeNotification(nf, customButtons)
-    local idx = nil
-    for i, v in ipairs(activeNotifications) do
-        if v == nf then idx = i; break end
-    end
+    local idx = table.find(activeNotifications, nf)
     if idx then table.remove(activeNotifications, idx) end
     for i, n in ipairs(activeNotifications) do
         local ny = 5 + ((i - 1) * (customButtons and 100 or 72))
         pcall(function()
+            -- Определяем тип уведомления по его свойствам
             local isConfirm = customButtons
             local isFirst = (n.Title == "Notification" and n.Message:find("Vanezy Scripts"))
             local tx, toff = 0.5, -135
@@ -685,13 +671,15 @@ function createNotification(title, message, duration, customButtons)
     local nf = Instance.new("Frame")
     nf.Size = UDim2.new(0, 270, 0, customButtons and 90 or 62)
     
-    local isConfirm = customButtons
-    local isFirst = (title == "Notification" and message:find("Vanezy Scripts"))
+    -- ОПРЕДЕЛЯЕМ ТИП УВЕДОМЛЕНИЯ
+    local isConfirm = customButtons  -- Подтверждение закрытия
+    local isFirst = (title == "Notification" and message:find("Vanezy Scripts"))  -- Первое уведомление
     
+    -- ПОЗИЦИЯ:
     if isConfirm or isFirst then
-        nf.Position = UDim2.new(0.5, -135, 0, -100)
+        nf.Position = UDim2.new(0.5, -135, 0, -100)  -- По центру
     else
-        nf.Position = UDim2.new(1, -270, 0, -50)
+        nf.Position = UDim2.new(1, -270, 0, -50)     -- Справа, высота -50
     end
     
     nf.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
@@ -762,18 +750,18 @@ function createNotification(title, message, duration, customButtons)
     timeLine.Parent = nf
     local yPos = -5 + (#activeNotifications * (customButtons and 100 or 72))
 
-    local targetX, targetOffset
-    if isConfirm or isFirst then
-        targetX = 0.5
-        targetOffset = -135
-    else
-        targetX = 1
-        targetOffset = -270
-    end
+local targetX, targetOffset
+if isConfirm or isFirst then
+    targetX = 0.5
+    targetOffset = -135
+else
+    targetX = 1
+    targetOffset = -270
+end
 
-    TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(targetX, targetOffset, 0, yPos)
-    }):Play()
+TweenService:Create(nf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    Position = UDim2.new(targetX, targetOffset, 0, yPos)
+}):Play()
     local lineTween = TweenService:Create(timeLine, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 2)})
     lineTween:Play()
     local isClosed = false
@@ -782,14 +770,14 @@ function createNotification(title, message, duration, customButtons)
         isClosed = true
         pcall(function() lineTween:Cancel() end)
         local closeX, closeOffset
-        if isConfirm or isFirst then
-            closeX = 0.5
-            closeOffset = -135
-        else
-            closeX = 1
-            closeOffset = -270
-        end
-        local ht = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(closeX, closeOffset, 0, -100)})
+if isConfirm or isFirst then
+    closeX = 0.5
+    closeOffset = -135
+else
+    closeX = 1
+    closeOffset = -270
+end
+local ht = TweenService:Create(nf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(closeX, closeOffset, 0, -100)})
         ht:Play()
         ht.Completed:Connect(function()
             if nf and nf.Parent then nf:Destroy() end
@@ -1122,7 +1110,7 @@ local function updateStatusBar()
     if getgenv().Triggerbot then table.insert(activeFuncs, {name = "Trigger", key = "Triggerbot"}) end
     if getgenv().ESPWallCheck then table.insert(activeFuncs, {name = "WallCheck", key = "ESPWallCheck"}) end
     if getgenv().GodMode then table.insert(activeFuncs, {name = "God", key = "GodMode"}) end
-    if getgenv().FullBright then table.insert(activeFuncs, {name = "Bright", key = "FullBright"}) end
+if getgenv().FullBright then table.insert(activeFuncs, {name = "Bright", key = "FullBright"}) end
     
     if #activeFuncs == 0 then
         StatusText.Text = "No functions active"
@@ -2417,6 +2405,7 @@ antiAFKToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- Fly
 local flyFrame = Instance.new("Frame")
 flyFrame.Size = UDim2.new(1, -16, 0, 42)
 flyFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2478,6 +2467,7 @@ flyToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- Noclip
 local noclipFrame = Instance.new("Frame")
 noclipFrame.Size = UDim2.new(1, -16, 0, 42)
 noclipFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2539,6 +2529,7 @@ noclipToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- Speed Boost
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, -16, 0, 42)
 speedFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2600,6 +2591,7 @@ speedToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- Infinite Jump
 local jumpFrame = Instance.new("Frame")
 jumpFrame.Size = UDim2.new(1, -16, 0, 42)
 jumpFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2659,6 +2651,7 @@ jumpToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- God Mode
 local godFrame = Instance.new("Frame")
 godFrame.Size = UDim2.new(1, -16, 0, 42)
 godFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
@@ -2720,6 +2713,7 @@ godToggleBg.InputBegan:Connect(function(input)
     end
 end)
 
+-- Full Bright
 local brightFrame = Instance.new("Frame")
 brightFrame.Size = UDim2.new(1, -16, 0, 42)
 brightFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
